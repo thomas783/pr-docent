@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "PR Docent",
+  "version": "0.1.0",
+  "description": "Guided, narrated review tours on top of GitHub pull request diffs.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["src/loader.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/*.js", "tours/*.json"],
+      "matches": ["https://github.com/*"]
+    }
+  ]
+}
