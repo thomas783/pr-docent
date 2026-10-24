@@ -54,6 +54,25 @@ export class Player {
     return this.goTo(this.index - 1);
   }
 
+  /** Index of the closest "focus" step after (direction 1) or before (-1) the current one, or -1. */
+  findFocus(direction) {
+    for (let i = this.index + direction; i >= 0 && i < this.steps.length; i += direction) {
+      if (this.steps[i].level === "focus") return i;
+    }
+    return -1;
+  }
+
+  /** Skips ahead to the next step marked "focus"; false when there is none. */
+  nextFocus() {
+    const index = this.findFocus(1);
+    return index >= 0 && this.goTo(index);
+  }
+
+  previousFocus() {
+    const index = this.findFocus(-1);
+    return index >= 0 && this.goTo(index);
+  }
+
   /** Jumps to the first step of a chapter. */
   goToChapter(chapterIndex) {
     const index = this.steps.findIndex((s) => s.chapterIndex === chapterIndex);

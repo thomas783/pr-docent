@@ -54,4 +54,29 @@ describe("Player", () => {
     player.next();
     assert.deepEqual(events, ["play:0", "step:1", "pause:1"]);
   });
+
+  it("skips between focus steps in both directions", () => {
+    const { tour: mixed } = parseTour({
+      version: 1,
+      pr: { owner: "o", repo: "r", number: 1 },
+      chapters: [
+        { title: "A", steps: [{ file: "a1", level: "skim" }, { file: "a2", level: "focus" }] },
+        { title: "B", steps: [{ file: "b1", level: "skip" }, { file: "b2", level: "focus" }, { file: "b3" }] },
+      ],
+    });
+    const player = new Player(mixed);
+    assert.equal(player.nextFocus(), true);
+    assert.equal(player.current.file, "a2");
+    player.nextFocus();
+    assert.equal(player.current.file, "b2");
+    assert.equal(player.nextFocus(), false, "no focus step after b2");
+    assert.equal(player.current.file, "b2");
+    player.goTo(4);
+    player.previousFocus();
+    assert.equal(player.current.file, "b2");
+    player.previousFocus();
+    assert.equal(player.current.file, "a2");
+    assert.equal(player.previousFocus(), false);
+    assert.equal(player.findFocus(-1), -1);
+  });
 });
