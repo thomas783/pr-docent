@@ -37,6 +37,10 @@ export class TourPanel {
     if (!opening) return this.stop();
     if (!this.player) await this.load();
     this.render();
+    if (this.player) {
+      await this.focusCurrent();
+      this.render();
+    }
   }
 
   destroy() {
