@@ -12,6 +12,7 @@
 const HIGHLIGHT_STYLE_ID = "prdocent-highlight";
 const ROW_STYLE = "background-color: rgba(130, 80, 223, 0.16) !important;";
 const FILE_STYLE = "outline: 3px solid #8250df; outline-offset: 2px; border-radius: 6px;";
+const READING_LINE = 0.25;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
 export function parsePullRequestPath(pathname) {
@@ -84,13 +85,22 @@ export async function focusStep(step) {
     if (present.length) {
       setHighlight(`${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} }
         ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
-      present[0].scrollIntoView({ block: present.length > 12 ? "start" : "center", behavior: "smooth" });
+      scrollToReadingLine(present[0]);
       return { found: "lines", count: present.length };
     }
   }
   setHighlight(`#${fileId} { ${FILE_STYLE} }`);
-  document.getElementById(fileId).scrollIntoView({ block: "start", behavior: "smooth" });
+  scrollToReadingLine(document.getElementById(fileId));
   return { found: "file" };
+}
+
+/**
+ * Every step lands at the same height (a quarter down the viewport), so the reader's
+ * eyes stay in one place; "start" would also hide the target under GitHub's sticky headers.
+ */
+function scrollToReadingLine(element) {
+  const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight * READING_LINE;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
 }
 
 export function clearHighlight() {
