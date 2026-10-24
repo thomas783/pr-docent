@@ -15,7 +15,7 @@ const FILE_STYLE = "outline: 3px solid #8250df; outline-offset: 2px; border-radi
 const READING_LINE = 0.25;
 // Spotlight: every other diff cell fades so only the step's lines stand out. The step's rows
 // win because their selector is more specific (the :has() argument counts).
-const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.3; transition: opacity 0.3s; }`;
+const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.2; transition: opacity 0.3s; }`;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
 export function parsePullRequestPath(pathname) {

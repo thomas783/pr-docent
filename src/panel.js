@@ -5,11 +5,12 @@
 import { clearHighlight, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
-import { parseTour, readingSeconds, tourFileName, uncoveredFiles } from "./tour.js";
+import { parseTour, splitSentences, tourFileName, uncoveredFiles } from "./tour.js";
 
 const LEVEL_LABEL = { focus: "집중", skim: "훑기", skip: "생략 가능" };
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
+const POINT_LABEL = "리뷰 포인트";
 
 export class TourPanel {
   constructor(pr) {
@@ -25,6 +26,7 @@ export class TourPanel {
     this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">▶ PR Docent</button><aside class="panel" hidden></aside>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
+    this.sentenceStart = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
     document.body.append(this.host);
   }
@@ -34,7 +36,10 @@ export class TourPanel {
     this.panel.hidden = !opening;
     this.launcher.classList.toggle("active", opening);
     reservePageSpace(opening);
-    if (!opening) return this.stop();
+    if (!opening) {
+      this.stop();
+      return clearHighlight();
+    }
     if (!this.player) await this.load();
     this.render();
     if (this.player) {
@@ -117,17 +122,29 @@ export class TourPanel {
         : "";
   }
 
+  /**
+   * Reads the step one sentence at a time. [from] is a character offset into the step's
+   * narration, used to resume mid-step after a rate change.
+   */
   async narrate(from = 0) {
     const token = ++this.narrationToken;
     const step = this.player.current;
-    const text = (this.player.startsChapter ? `${step.chapterTitle}. ` : "") + step.note;
-    if (this.settings.voice) {
-      await speak(text, { rate: this.settings.rate, from });
-    } else {
-      await sleep((readingSeconds(text.slice(from)) * 1000) / this.settings.rate);
+    const intro = (this.player.startsChapter ? `${step.chapterTitle}. ` : "") + step.note;
+    const text = step.point ? `${intro} ${POINT_LABEL}: ${step.point}` : intro;
+    for (const sentence of splitSentences(text)) {
+      if (sentence.start + sentence.text.length <= from) continue;
+      this.sentenceStart = sentence.start;
+      const offset = Math.max(0, from - sentence.start);
+      if (this.settings.voice) {
+        await speak(sentence.text, { rate: this.settings.rate, from: offset });
+      } else {
+        await sleep((Math.max(1.5, sentence.text.slice(offset).length / 12) * 1000) / this.settings.rate);
+      }
+      if (token !== this.narrationToken) return;
     }
-    if (token === this.narrationToken && this.player.playing) this.player.next();
+    if (this.player.playing) this.player.next();
   }
+
 
   stop() {
     this.narrationToken++;
@@ -164,6 +181,7 @@ export class TourPanel {
         <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}</p>
         <span class="level ${step.level}">${LEVEL_LABEL[step.level]}</span>
         <p class="note">${esc(step.note)}</p>
+        ${step.point ? `<p class="point"><b>${POINT_LABEL}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
 
@@ -223,7 +241,9 @@ export class TourPanel {
     // from the word being read with a new utterance. narrate() bumps the token, so the
     // old reading won't advance the step.
     if (!this.settings.voice) stopSpeaking();
-    if (this.player?.playing) this.narrate("rate" in patch && this.settings.voice ? spokenIndex() : 0);
+    if (this.player?.playing) {
+      this.narrate("rate" in patch && this.settings.voice ? this.sentenceStart + spokenIndex() : this.sentenceStart);
+    }
   }
 }
 
@@ -312,6 +332,9 @@ const STYLES = `
   .level.skim { background: #ddf4ff; color: #0550ae; }
   .level.skip { background: #eff2f5; color: #59636e; }
   .note { white-space: pre-wrap; }
+  .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
+    background: var(--bgColor-attention-muted, #fff8c5); }
+  .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
   .controls { display: flex; gap: 6px; margin-top: 10px; }
   .controls button { flex: 1; padding: 6px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }

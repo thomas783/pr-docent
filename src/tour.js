@@ -6,12 +6,12 @@
 //   "pr": { "owner": "your-org", "repo": "your-repo", "number": 42 },
 //   "title": "...", "summary": "...",
 //   "chapters": [{ "title": "...", "summary": "...", "steps": [
-//     { "file": "path/in/repo.kt", "lines": [10, 24], "side": "right", "level": "focus", "note": "..." }
+//     { "file": "path/in/repo.kt", "lines": [10, 24], "side": "right", "level": "focus", "note": "...", "point": "..." }
 //   ]}],
 //   "skipped": [{ "file": "server/gradlew", "reason": "generated wrapper" }]
 // }
 // lines and side are optional (without lines the step points at the whole file);
-// level is focus | skim | skip.
+// level is focus | skim | skip; point (optional) is what the reviewer should check.
 
 export const LEVELS = ["focus", "skim", "skip"];
 
@@ -45,7 +45,8 @@ export function parseTour(raw) {
       if (side !== "left" && side !== "right") fail(`${where}.side must be "left" or "right"`);
       const level = step.level ?? "skim";
       if (!LEVELS.includes(level)) fail(`${where}.level must be one of ${LEVELS.join(", ")}`);
-      return { file: step.file, lines, side, level, note: String(step.note ?? "") };
+      if (step.point !== undefined && typeof step.point !== "string") fail(`${where}.point must be a string`);
+      return { file: step.file, lines, side, level, note: String(step.note ?? ""), point: step.point ?? "" };
     });
     return { title: String(chapter.title ?? ""), summary: String(chapter.summary ?? ""), steps };
   });
@@ -84,6 +85,30 @@ export function uncoveredFiles(tour, prFiles) {
 /** Seconds a step stays on screen when narration is off: roughly reading speed, at least 4s. */
 export function readingSeconds(text) {
   return Math.max(4, Math.round(String(text).length / 12));
+}
+
+/**
+ * Splits narration into sentences, each with its offset in [text], so it can be read (and
+ * resumed) a sentence at a time. A period after a digit ("2. 집중 단계") is a list number,
+ * not a sentence end.
+ */
+export function splitSentences(text) {
+  const sentences = [];
+  const pattern = /[^\d\s][.!?](?=\s)/g;
+  let start = 0;
+  for (let match; (match = pattern.exec(text)); ) {
+    const end = match.index + match[0].length;
+    pushSentence(sentences, text, start, end);
+    start = end;
+  }
+  pushSentence(sentences, text, start, text.length);
+  return sentences;
+}
+
+function pushSentence(sentences, text, start, end) {
+  const raw = text.slice(start, end);
+  const trimmed = raw.trim();
+  if (trimmed) sentences.push({ start: start + raw.indexOf(trimmed), text: trimmed });
 }
 
 /** The bundled tour file name for a PR, e.g. "your-org--your-repo--42.json". */
