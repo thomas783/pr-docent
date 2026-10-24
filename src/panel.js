@@ -4,7 +4,7 @@
 
 import { clearHighlight, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
-import { speak, speechAvailable, stopSpeaking } from "./speech.js";
+import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
 import { parseTour, readingSeconds, tourFileName, uncoveredFiles } from "./tour.js";
 
 const LEVEL_LABEL = { focus: "집중", skim: "훑기", skip: "생략 가능" };
@@ -117,14 +117,14 @@ export class TourPanel {
         : "";
   }
 
-  async narrate() {
+  async narrate(from = 0) {
     const token = ++this.narrationToken;
     const step = this.player.current;
     const text = (this.player.startsChapter ? `${step.chapterTitle}. ` : "") + step.note;
     if (this.settings.voice) {
-      await speak(text, { rate: this.settings.rate });
+      await speak(text, { rate: this.settings.rate, from });
     } else {
-      await sleep((readingSeconds(text) * 1000) / this.settings.rate);
+      await sleep((readingSeconds(text.slice(from)) * 1000) / this.settings.rate);
     }
     if (token === this.narrationToken && this.player.playing) this.player.next();
   }
@@ -219,7 +219,11 @@ export class TourPanel {
   updateSettings(patch) {
     this.settings = { ...this.settings, ...patch };
     storageSet(SETTINGS_KEY, this.settings);
+    // An utterance's rate can't change once it has started, so a rate change continues
+    // from the word being read with a new utterance. narrate() bumps the token, so the
+    // old reading won't advance the step.
     if (!this.settings.voice) stopSpeaking();
+    if (this.player?.playing) this.narrate("rate" in patch && this.settings.voice ? spokenIndex() : 0);
   }
 }
 
