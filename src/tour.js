@@ -12,6 +12,8 @@
 // }
 // lines and side are optional (without lines the step points at the whole file);
 // level is focus | skim | skip; point (optional) is what the reviewer should check.
+// note is a string, or a list of beats that each point at the lines they talk about:
+//   "note": [{ "text": "findFocus finds ...", "lines": [58, 63] }, { "text": "..." }]
 
 export const LEVELS = ["focus", "skim", "skip"];
 
@@ -32,21 +34,15 @@ export function parseTour(raw) {
     const steps = (chapter.steps || []).map((step, s) => {
       const where = `chapters[${c}].steps[${s}]`;
       if (typeof step.file !== "string" || !step.file) fail(`${where}.file is required`);
-      let lines = null;
-      if (step.lines !== undefined) {
-        const [start, end] = Array.isArray(step.lines) ? step.lines : [];
-        if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
-          fail(`${where}.lines must be [start, end] with 1 <= start <= end`);
-        } else {
-          lines = [start, end];
-        }
-      }
+      const lines = parseLines(step.lines, where, fail);
       const side = step.side ?? "right";
       if (side !== "left" && side !== "right") fail(`${where}.side must be "left" or "right"`);
       const level = step.level ?? "skim";
       if (!LEVELS.includes(level)) fail(`${where}.level must be one of ${LEVELS.join(", ")}`);
       if (step.point !== undefined && typeof step.point !== "string") fail(`${where}.point must be a string`);
-      return { file: step.file, lines, side, level, note: String(step.note ?? ""), point: step.point ?? "" };
+      const beats = parseBeats(step.note, where, fail);
+      const note = beats.map((beat) => beat.text).join(" ");
+      return { file: step.file, lines, side, level, note, beats, point: step.point ?? "" };
     });
     return { title: String(chapter.title ?? ""), summary: String(chapter.summary ?? ""), steps };
   });
@@ -64,6 +60,27 @@ export function parseTour(raw) {
     },
     errors: [],
   };
+}
+
+/** [start, end] line range, or null when absent; reports a malformed one through [fail]. */
+function parseLines(value, where, fail) {
+  if (value === undefined) return null;
+  const [start, end] = Array.isArray(value) ? value : [];
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
+    fail(`${where}.lines must be [start, end] with 1 <= start <= end`);
+    return null;
+  }
+  return [start, end];
+}
+
+/** A note as beats: a plain string is one beat that points at no particular lines. */
+function parseBeats(note, where, fail) {
+  if (!Array.isArray(note)) return note ? [{ text: String(note), lines: null }] : [];
+  return note.map((beat, b) => {
+    const at = `${where}.note[${b}]`;
+    if (typeof beat?.text !== "string" || !beat.text) fail(`${at}.text is required`);
+    return { text: String(beat?.text ?? ""), lines: parseLines(beat?.lines, at, fail) };
+  });
 }
 
 /** Every step in order, with its chapter index and its position inside the chapter. */
@@ -109,6 +126,20 @@ function pushSentence(sentences, text, start, end) {
   const raw = text.slice(start, end);
   const trimmed = raw.trim();
   if (trimmed) sentences.push({ start: start + raw.indexOf(trimmed), text: trimmed });
+}
+
+/**
+ * What to say for a step, one sentence per unit, each with the lines to point at while it
+ * is read (null: just the step's own range). Opens with the chapter title when given and
+ * ends with the review point.
+ */
+export function narrationUnits(step, { chapterTitle = "", pointLabel = "" } = {}) {
+  const units = [];
+  const add = (text, lines) => splitSentences(text).forEach((s) => units.push({ text: s.text, lines }));
+  if (chapterTitle) add(`${chapterTitle}.`, null);
+  for (const beat of step.beats) add(beat.text, beat.lines);
+  if (step.point) add(`${pointLabel}: ${step.point}`, null);
+  return units;
 }
 
 /** The bundled tour file name for a PR, e.g. "your-org--your-repo--42.json". */

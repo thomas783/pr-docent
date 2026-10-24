@@ -2,10 +2,10 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
-import { parseTour, splitSentences, tourFileName, uncoveredFiles } from "./tour.js";
+import { narrationUnits, parseTour, tourFileName, uncoveredFiles } from "./tour.js";
 
 const LEVEL_LABEL = { focus: "집중", skim: "훑기", skip: "생략 가능" };
 const PANEL_WIDTH = 360;
@@ -26,7 +26,7 @@ export class TourPanel {
     this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">▶ PR Docent</button><aside class="panel" hidden></aside>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
-    this.sentenceStart = 0;
+    this.unitIndex = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
     document.body.append(this.host);
   }
@@ -123,28 +123,31 @@ export class TourPanel {
   }
 
   /**
-   * Reads the step one sentence at a time. [from] is a character offset into the step's
-   * narration, used to resume mid-step after a rate change.
+   * Reads the step one sentence at a time, pointing at the lines each sentence talks about.
+   * [from] says where to start ({ unit, char }), used to resume mid-step after a rate change.
    */
-  async narrate(from = 0) {
+  async narrate(from = { unit: 0, char: 0 }) {
     const token = ++this.narrationToken;
     const step = this.player.current;
-    const intro = (this.player.startsChapter ? `${step.chapterTitle}. ` : "") + step.note;
-    const text = step.point ? `${intro} ${POINT_LABEL}: ${step.point}` : intro;
-    for (const sentence of splitSentences(text)) {
-      if (sentence.start + sentence.text.length <= from) continue;
-      this.sentenceStart = sentence.start;
-      const offset = Math.max(0, from - sentence.start);
+    const units = narrationUnits(step, {
+      chapterTitle: this.player.startsChapter ? step.chapterTitle : "",
+      pointLabel: POINT_LABEL,
+    });
+    for (let i = from.unit; i < units.length; i++) {
+      this.unitIndex = i;
+      const { text, lines } = units[i];
+      const offset = i === from.unit ? from.char : 0;
+      await emphasize(step, lines);
+      if (token !== this.narrationToken) return;
       if (this.settings.voice) {
-        await speak(sentence.text, { rate: this.settings.rate, from: offset });
+        await speak(text, { rate: this.settings.rate, from: offset });
       } else {
-        await sleep((Math.max(1.5, sentence.text.slice(offset).length / 12) * 1000) / this.settings.rate);
+        await sleep((Math.max(1.5, text.slice(offset).length / 12) * 1000) / this.settings.rate);
       }
       if (token !== this.narrationToken) return;
     }
     if (this.player.playing) this.player.next();
   }
-
 
   stop() {
     this.narrationToken++;
@@ -242,7 +245,8 @@ export class TourPanel {
     // old reading won't advance the step.
     if (!this.settings.voice) stopSpeaking();
     if (this.player?.playing) {
-      this.narrate("rate" in patch && this.settings.voice ? this.sentenceStart + spokenIndex() : this.sentenceStart);
+      const char = "rate" in patch && this.settings.voice ? spokenIndex() : 0;
+      this.narrate({ unit: this.unitIndex, char });
     }
   }
 }

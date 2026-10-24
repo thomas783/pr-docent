@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { flattenSteps, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
+import { flattenSteps, narrationUnits, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
 
 const valid = {
   version: 1,
@@ -17,7 +17,7 @@ describe("parseTour", () => {
   it("normalizes defaults", () => {
     const { tour, errors } = parseTour(valid);
     assert.deepEqual(errors, []);
-    assert.deepEqual(tour.chapters[0].steps[1], { file: "b.kt", lines: null, side: "right", level: "skim", note: "", point: "" });
+    assert.deepEqual(tour.chapters[0].steps[1], { file: "b.kt", lines: null, side: "right", level: "skim", note: "", beats: [], point: "" });
     assert.equal(tour.chapters[1].steps[0].side, "left");
   });
 
@@ -37,6 +37,20 @@ describe("parseTour", () => {
     const tour = (point) => ({ ...valid, chapters: [{ title: "A", steps: [{ file: "a.kt", point }] }] });
     assert.equal(parseTour(tour("check the guard")).tour.chapters[0].steps[0].point, "check the guard");
     assert.match(parseTour(tour(3)).errors[0], /point must be a string/);
+  });
+
+  it("reads a note as beats that point at lines", () => {
+    const note = [{ text: "First.", lines: [3, 5] }, { text: "Then this." }];
+    const { tour } = parseTour({ ...valid, chapters: [{ title: "A", steps: [{ file: "a.kt", note }] }] });
+    const step = tour.chapters[0].steps[0];
+    assert.deepEqual(step.beats, [{ text: "First.", lines: [3, 5] }, { text: "Then this.", lines: null }]);
+    assert.equal(step.note, "First. Then this.");
+  });
+
+  it("reports malformed beats", () => {
+    const note = [{ lines: [3, 5] }, { text: "x", lines: [9, 2] }];
+    const { errors } = parseTour({ ...valid, chapters: [{ title: "A", steps: [{ file: "a.kt", note }] }] });
+    assert.deepEqual(errors, ["chapters[0].steps[0].note[0].text is required", "chapters[0].steps[0].note[1].lines must be [start, end] with 1 <= start <= end"]);
   });
 
   it("rejects non-objects and empty tours", () => {
@@ -71,6 +85,19 @@ describe("splitSentences", () => {
   it("does not split version numbers or a trailing period", () => {
     assert.deepEqual(splitSentences("v1.2 버전입니다.").map((s) => s.text), ["v1.2 버전입니다."]);
     assert.deepEqual(splitSentences("  "), []);
+  });
+});
+
+describe("narrationUnits", () => {
+  it("reads the chapter, each beat's sentences with its lines, then the point", () => {
+    const step = { beats: [{ text: "Finds it. Returns -1.", lines: [3, 5] }, { text: "Moves.", lines: null }], point: "Check edges." };
+    assert.deepEqual(narrationUnits(step, { chapterTitle: "2. Focus", pointLabel: "Point" }), [
+      { text: "2. Focus.", lines: null },
+      { text: "Finds it.", lines: [3, 5] },
+      { text: "Returns -1.", lines: [3, 5] },
+      { text: "Moves.", lines: null },
+      { text: "Point: Check edges.", lines: null },
+    ]);
   });
 });
 
