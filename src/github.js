@@ -13,6 +13,9 @@ const HIGHLIGHT_STYLE_ID = "prdocent-highlight";
 const ROW_STYLE = "background-color: rgba(130, 80, 223, 0.16) !important;";
 const FILE_STYLE = "outline: 3px solid #8250df; outline-offset: 2px; border-radius: 6px;";
 const READING_LINE = 0.25;
+// Spotlight: every other diff cell fades so only the step's lines stand out. The step's rows
+// win because their selector is more specific (the :has() argument counts).
+const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.3; transition: opacity 0.3s; }`;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
 export function parsePullRequestPath(pathname) {
@@ -83,7 +86,8 @@ export async function focusStep(step) {
     const rows = rowSelectors(hash, step.side, step.lines);
     const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
     if (present.length) {
-      setHighlight(`${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} }
+      setHighlight(`${DIM_STYLE}
+        ${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} opacity: 1; }
         ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
       scrollToReadingLine(present[0]);
       return { found: "lines", count: present.length };
