@@ -1,10 +1,37 @@
 {
   "name": "pr-docent",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "description": "Guided, narrated review tours on top of GitHub pull request diffs.",
+  "description": "Guided, narrated review tours on top of GitHub pull request diffs. This package installs the local tour generator for the PR Docent Chrome extension.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thomas783/pr-docent.git"
+  },
+  "homepage": "https://github.com/thomas783/pr-docent#readme",
+  "keywords": [
+    "github",
+    "pull-request",
+    "code-review",
+    "chrome-extension",
+    "claude"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "pr-docent": "bin/pr-docent.mjs"
+  },
+  "files": [
+    "bin/",
+    "host/",
+    "src/diff.js",
+    "src/tour.js",
+    "scripts/check-tour.mjs",
+    "scripts/tour-prompt.md"
+  ],
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "install-host": "node scripts/install-host.mjs"
+    "install-host": "node bin/pr-docent.mjs install"
   }
 }

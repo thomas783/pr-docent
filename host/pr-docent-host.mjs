@@ -1,7 +1,7 @@
 // Local generator: Chrome starts this through native messaging when the panel asks for a tour.
 // It writes the PR's diff and changed files to a temporary folder, runs the user's own Claude
 // Code (their subscription, no API key) with the same prompt and checker as the GitHub Actions
-// workflow, and sends the checked tour back. Installed by scripts/install-host.mjs.
+// workflow, and sends the checked tour back. Installed by `pr-docent install` (bin/pr-docent.mjs).
 
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
