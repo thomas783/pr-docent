@@ -41,8 +41,9 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PR: ${{ github.repository }}#${{ github.event.pull_request.number }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
-      OUT: .pr-docent-out
-      TOOLS: .pr-docent-tools
+      # Absolute paths: Claude may cd, and its write permission is pinned to one absolute file.
+      OUT: ${{ github.workspace }}/.pr-docent-out
+      TOOLS: ${{ github.workspace }}/.pr-docent-tools
     steps:
       - name: Check out the PR's head commit
         uses: actions/checkout@v4
@@ -54,7 +55,7 @@ jobs:
         with:
           repository: thomas783/pr-docent
           ref: ${{ inputs.tools-ref }}
-          path: ${{ env.TOOLS }}
+          path: .pr-docent-tools
 
       - uses: actions/setup-node@v4
         with:
@@ -75,11 +76,12 @@ jobs:
           npm install --global @anthropic-ai/claude-code
           sed -e "s|{{PR}}|$PR|g" -e "s|{{OUT}}|$OUT|g" -e "s|{{TOOLS}}|$TOOLS|g" -e "s|{{LANGUAGE}}|$LANGUAGE|g" \
             "$TOOLS/scripts/tour-prompt.md" > "$RUNNER_TEMP/prompt.md"
-          # Edit(path) also covers the Write tool, so Claude can create only the tour file.
+          # Edit(path) also covers the Write tool, so Claude can create only the tour file
+          # ("//" marks an absolute path in permission rules).
           claude -p "$(cat "$RUNNER_TEMP/prompt.md")" \
             --model "${{ inputs.model }}" \
             --permission-mode dontAsk \
-            --allowedTools "Read,Glob,Grep,Edit($OUT/tour.json),Bash(node $TOOLS/scripts/check-tour.mjs:*),Bash(git log:*),Bash(git show:*)"
+            --allowedTools "Read,Glob,Grep,Edit(/$OUT/tour.json),Bash(node $TOOLS/scripts/check-tour.mjs:*),Bash(git log:*),Bash(git show:*)"
 
       - name: Check the tour
         run: node "$TOOLS/scripts/check-tour.mjs" "$OUT/tour.json" "$OUT/pr.diff" "$PR"

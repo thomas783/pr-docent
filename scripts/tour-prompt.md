@@ -18,7 +18,8 @@ Write the tour to `{{OUT}}/tour.json`, then run
     node {{TOOLS}}/scripts/check-tour.mjs {{OUT}}/tour.json {{OUT}}/pr.diff {{PR}}
 
 and fix every problem it reports until it prints `OK`. Then stop. Do not post comments or
-change any other file.
+change any other file. Use these absolute paths as written and do not change directory:
+`{{OUT}}/tour.json` is the only file you are allowed to write.
 
 ## Format
 
