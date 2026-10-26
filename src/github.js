@@ -6,6 +6,9 @@
 // - large files are collapsed behind a "Load Diff" button; markdown shows a rendered view
 //   and binaries have no line cells, so those steps fall back to the file itself
 // - changing location.hash does not scroll, so we scroll ourselves
+// - comment bodies are server-rendered (.comment-body) on the Conversation page
+
+import { findTourInBlocks } from "./tour.js";
 
 // Highlights are CSS rules keyed on GitHub's own anchors rather than classes on elements:
 // React re-renders (e.g. after "Load Diff") replace the nodes and would drop our classes.
@@ -31,6 +34,22 @@ export function parsePullRequestPath(pathname) {
 export async function sha256Hex(text) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * The tour posted in the PR's comments (by the generate-tour workflow), or null. Reads the
+ * Conversation page with the viewer's own session, so it works on private repositories too.
+ */
+export async function fetchCommentTour(pr) {
+  try {
+    const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
+    if (!response.ok) return null;
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    const blocks = [...page.querySelectorAll(".comment-body pre")].map((pre) => pre.textContent);
+    return findTourInBlocks(blocks, pr);
+  } catch {
+    return null;
+  }
 }
 
 /** Paths of every file in the PR, read from the diff containers' headers. */
@@ -94,12 +113,12 @@ export async function focusStep(step) {
       setHighlight(`${DIM_STYLE}
         ${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} opacity: 1; }
         ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
-      scrollToReadingLine(present[0]);
+      await scrollToReadingLine(firstShown(rows));
       return { found: "lines", count: present.length };
     }
   }
   setHighlight(`#${fileId} { ${FILE_STYLE} }`);
-  scrollToReadingLine(document.getElementById(fileId));
+  await scrollToReadingLine(() => document.getElementById(fileId));
   return { found: "file" };
 }
 
@@ -120,16 +139,38 @@ export async function emphasize(step, lines) {
     ${rows.map((sel) => `html ${sel} > td`).join(",\n")} { ${EMPHASIS_ROW_STYLE} }`);
   const top = present[0].getBoundingClientRect().top;
   const bottom = present.at(-1).getBoundingClientRect().bottom;
-  if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) scrollToReadingLine(present[0]);
+  if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) await scrollToReadingLine(firstShown(rows));
+}
+
+/** Finds the first of [rows] on the page at call time (React may have replaced the nodes). */
+function firstShown(rows) {
+  return () => rows.map((sel) => document.querySelector(sel)).find(Boolean) ?? null;
 }
 
 /**
  * Every step lands at the same height (a quarter down the viewport), so the reader's
  * eyes stay in one place; "start" would also hide the target under GitHub's sticky headers.
  */
-function scrollToReadingLine(element) {
-  const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight * READING_LINE;
-  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+async function scrollToReadingLine(find) {
+  const offset = () => {
+    const element = find();
+    return element ? element.getBoundingClientRect().top - window.innerHeight * READING_LINE : null;
+  };
+  const first = offset();
+  if (first === null || Math.abs(first) < 24) return;
+  window.scrollTo({ top: Math.max(0, window.scrollY + first), behavior: "smooth" });
+  await new Promise((resolve) => {
+    window.addEventListener("scrollend", resolve, { once: true });
+    setTimeout(resolve, 1500);
+  });
+  // Files between the start and the target render lazily as they scroll past and grow,
+  // pushing the target down; follow it until it stays put.
+  for (let i = 0; i < 5; i++) {
+    const drift = offset();
+    if (drift === null || Math.abs(drift) < 24 || window.scrollY + drift < 0) return;
+    window.scrollTo({ top: window.scrollY + drift, behavior: "instant" });
+    await sleep(300);
+  }
 }
 
 export function clearHighlight() {

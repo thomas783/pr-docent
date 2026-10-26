@@ -1,0 +1,24 @@
+name: PR Docent tour
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push replaces the tour for the previous commit, so cancel that run.
+concurrency:
+  group: pr-docent-tour-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tour:
+    # Pull requests from forks get no secrets, and drafts are still changing.
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/generate-tour.yml
+    with:
+      # This repo tests its own changes to the prompt and checker.
+      tools-ref: ${{ github.event.pull_request.head.sha }}
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    permissions:
+      contents: read
+      pull-requests: write

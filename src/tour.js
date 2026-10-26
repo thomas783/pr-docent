@@ -142,6 +142,24 @@ export function narrationUnits(step, { chapterTitle = "", pointLabel = "" } = {}
   return units;
 }
 
+/**
+ * The tour for [pr] among code blocks of the PR's comments (the generator posts it as a
+ * JSON block): the last block that parses as a version 1 tour of this PR, or null.
+ */
+export function findTourInBlocks(blocks, { owner, repo, number }) {
+  let found = null;
+  for (const text of blocks) {
+    let raw;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    if (raw?.version === 1 && raw.pr?.owner === owner && raw.pr?.repo === repo && raw.pr?.number === number) found = raw;
+  }
+  return found;
+}
+
 /** The bundled tour file name for a PR, e.g. "your-org--your-repo--42.json". */
 export function tourFileName({ owner, repo, number }) {
   return `${owner}--${repo}--${number}.json`;

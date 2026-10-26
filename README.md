@@ -32,8 +32,48 @@ GitHub의 diff 화면은 화살표 키와 한 글자 단축키를 이미 쓰므�
 2. **압축해제된 확장 프로그램을 로드합니다**를 누르고 이 폴더를 선택합니다.
 3. PR의 Files changed 탭을 열면 오른쪽 아래에 **▶ PR Docent** 버튼이 나타납니다.
 
+## 투어 자동 생성 (GitHub Actions)
+
+PR이 열리거나 커밋이 추가될 때마다 Claude Code가 diff를 읽고 투어를 만들어 PR 코멘트로 올립니다. 확장은 Files changed 탭에서 그 코멘트를 찾아 투어를 자동으로 불러옵니다. 비공개 저장소에서도 로그인한 사용자 권한으로 읽으므로 별도 토큰이 필요 없습니다.
+
+1. Claude 구독 계정으로 OAuth 토큰을 만듭니다. 생성에는 그 구독의 사용량이 쓰입니다.
+   ```bash
+   claude setup-token
+   ```
+2. 투어를 만들 저장소에 secret으로 등록합니다.
+   ```bash
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner>/<repo>
+   ```
+3. 그 저장소에 `.github/workflows/pr-docent.yml`을 추가합니다.
+   ```yaml
+   name: PR Docent tour
+   on:
+     pull_request:
+       types: [opened, synchronize, reopened, ready_for_review]
+   concurrency:
+     group: pr-docent-tour-${{ github.event.pull_request.number }}
+     cancel-in-progress: true
+   jobs:
+     tour:
+       if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+       uses: thomas783/pr-docent/.github/workflows/generate-tour.yml@main
+       secrets:
+         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+       permissions:
+         contents: read
+         pull-requests: write
+   ```
+
+동작 방식
+- Claude는 투어 파일 하나만 쓸 수 있고, 저장소의 다른 파일은 읽기만 합니다.
+- `scripts/check-tour.mjs`가 투어를 검사합니다. 형식, 모든 줄 번호가 실제 diff 화면에 보이는지, 문장별 줄이 단계 범위 안에 있는지, 바뀐 파일을 모두 다루거나 건너뛴 이유를 적었는지 확인합니다. Claude는 검사를 통과할 때까지 고치고, 통과하지 못하면 코멘트를 올리지 않습니다.
+- 코멘트는 PR마다 하나이며, 새 커밋이 올라오면 같은 코멘트를 갱신합니다.
+- 입력값 `model`(기본 `claude-opus-5-5`)과 `language`(기본 `한국어`)로 모델과 언어를 바꿀 수 있습니다.
+- 포크에서 온 PR에는 secret이 전달되지 않으므로 실행하지 않습니다.
+
 ## 투어 불러오기
 
+- PR 코멘트에 자동 생성된 투어가 있으면 그 투어를 불러옵니다. 직접 불러온 투어가 있으면 그쪽이 우선합니다.
 - `tours/<owner>--<repo>--<number>.json` 파일이 있으면 해당 PR에서 자동으로 불러옵니다.
 - 예제: [`tours/thomas783--pr-docent--1.json`](tours/thomas783--pr-docent--1.json) — 이 레포의 [PR #1](https://github.com/thomas783/pr-docent/pull/1/changes)(단축키와 집중 단계 건너뛰기)을 리뷰하는 투어입니다. 확장을 설치한 뒤 이 PR을 열면, PR Docent로 PR Docent 자신의 변경을 리뷰해 볼 수 있습니다.
 - 직접 만든 투어는 같은 폴더에 두면 자동으로 불러오고, 커밋되지 않습니다(`.gitignore` 참고). 공개 예제만 커밋합니다.
@@ -82,7 +122,8 @@ GitHub의 2026년 Files changed 화면 기준입니다. 화면 구조가 바뀌�
 ## 개발
 
 - 빌드 단계가 없습니다. 콘텐츠 스크립트(`src/loader.js`)가 ES 모듈(`src/main.js`)을 불러옵니다.
-- 테스트: `npm test` (Node 내장 테스트 러너). 투어 검증, 재생 상태, 단축키, PR 주소 해석, GitHub 파일 ID 해시, 줄 선택자를 다룹니다.
+- 테스트: `npm test` (Node 내장 테스트 러너). 투어 검증, diff 대조, 재생 상태, 단축키, PR 주소 해석, GitHub 파일 ID 해시, 줄 선택자를 다룹니다.
+- 투어 검사: `node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]` (`gh pr diff <number> > pr.diff`)
 
 ## 라이선스
 
@@ -90,5 +131,4 @@ MIT
 
 ## 다음 단계
 
-1. **투어 자동 생성:** PR diff를 가져와 LLM으로 투어 JSON을 만듭니다.
-2. **다듬기:** 구조 변화 다이어그램, 테스트 커버리지 표시, 비공개 레포 처리
+1. **다듬기:** 구조 변화 다이어그램, 테스트 커버리지 표시, 비공개 레포 처리

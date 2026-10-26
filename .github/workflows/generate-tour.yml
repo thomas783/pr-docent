@@ -1,0 +1,104 @@
+# Generates a PR Docent tour for a pull request with Claude Code and posts it as a PR comment
+# that the extension picks up. Call it from a workflow triggered by pull_request:
+#
+#   jobs:
+#     tour:
+#       uses: thomas783/pr-docent/.github/workflows/generate-tour.yml@main
+#       secrets:
+#         CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+#
+# The token comes from `claude setup-token` and uses that Claude subscription's quota.
+
+name: Generate PR Docent tour
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: Claude model that writes the tour
+        type: string
+        default: claude-opus-5-5
+      language:
+        description: Language of the tour's text
+        type: string
+        default: 한국어
+      tools-ref:
+        description: Ref of thomas783/pr-docent whose prompt and checker to use
+        type: string
+        default: main
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+
+jobs:
+  tour:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      PR: ${{ github.repository }}#${{ github.event.pull_request.number }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      # Absolute paths: Claude may cd, and its write permission is pinned to one absolute file.
+      OUT: ${{ github.workspace }}/.pr-docent-out
+      TOOLS: ${{ github.workspace }}/.pr-docent-tools
+    steps:
+      - name: Check out the PR's head commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check out PR Docent's prompt and checker
+        uses: actions/checkout@v4
+        with:
+          repository: thomas783/pr-docent
+          ref: ${{ inputs.tools-ref }}
+          path: .pr-docent-tools
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Collect the PR and its diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$OUT"
+          gh pr view "$PR_NUMBER" --json title,body,baseRefName,headRefName,headRefOid > "$OUT/pr.json"
+          gh pr diff "$PR_NUMBER" > "$OUT/pr.diff"
+          wc -l "$OUT/pr.diff"
+
+      - name: Write the tour with Claude Code
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          LANGUAGE: ${{ inputs.language }}
+        run: |
+          npm install --global @anthropic-ai/claude-code
+          node -e 'const fs = require("fs"); const { PR, OUT, TOOLS, LANGUAGE } = process.env;
+            const vars = { PR, OUT, TOOLS, LANGUAGE };
+            process.stdout.write(fs.readFileSync(process.argv[1], "utf8").replace(/{{(\w+)}}/g, (_, k) => vars[k]));' \
+            "$TOOLS/scripts/tour-prompt.md" > "$RUNNER_TEMP/prompt.md"
+          # Edit(path) also covers the Write tool, so Claude can create only the tour file
+          # ("//" marks an absolute path in permission rules).
+          claude -p "$(cat "$RUNNER_TEMP/prompt.md")" \
+            --model "${{ inputs.model }}" \
+            --permission-mode dontAsk \
+            --allowedTools "Read,Glob,Grep,Edit(/$OUT/tour.json),Bash(node $TOOLS/scripts/check-tour.mjs:*),Bash(git log:*),Bash(git show:*)"
+
+      - name: Check the tour
+        run: node "$TOOLS/scripts/check-tour.mjs" "$OUT/tour.json" "$OUT/pr.diff" "$PR"
+
+      - name: Post or update the tour comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node "$TOOLS/scripts/tour-comment.mjs" "$OUT/tour.json" > "$RUNNER_TEMP/comment.md"
+          id=$(gh api --paginate "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.body | startswith("<!-- pr-docent:tour -->")) | .id' | head -n 1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$id" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
+            echo "Updated comment $id"
+          else
+            gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/comment.md"
+          fi
