@@ -42,14 +42,31 @@ export async function sha256Hex(text) {
  */
 export async function fetchCommentTour(pr) {
   try {
-    const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
-    if (!response.ok) return null;
-    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    const { page } = await fetchConversation(pr);
     const blocks = [...page.querySelectorAll(".comment-body pre")].map((pre) => pre.textContent);
     return findTourInBlocks(blocks, pr);
   } catch {
     return null;
   }
+}
+
+/** Title, description and head commit of the PR, which local generation hands to Claude. */
+export async function fetchPullRequestDetails(pr) {
+  const { html, page } = await fetchConversation(pr);
+  const headSha = html.match(/"headSha":"([0-9a-f]{40})"/)?.[1] ?? [...page.querySelectorAll('input[name="oid"]')].at(-1)?.value;
+  if (!headSha) throw new Error("PR의 최신 커밋을 찾지 못했습니다.");
+  return {
+    title: page.querySelector("h1")?.textContent.trim().replace(/\s*-\s*#\d+$/, "") || document.title,
+    body: page.querySelector(".comment-body")?.textContent.trim() ?? "",
+    headSha,
+  };
+}
+
+async function fetchConversation(pr) {
+  const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
+  if (!response.ok) throw new Error(`PR 페이지를 읽지 못했습니다 (${response.status}).`);
+  const html = await response.text();
+  return { html, page: new DOMParser().parseFromString(html, "text/html") };
 }
 
 /** Paths of every file in the PR, read from the diff containers' headers. */

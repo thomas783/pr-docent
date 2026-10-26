@@ -71,6 +71,25 @@ PR이 열리거나 커밋이 추가될 때마다 Claude Code가 diff를 읽고 �
 - 입력값 `model`(기본 `claude-opus-5-5`)과 `language`(기본 `한국어`)로 모델과 언어를 바꿀 수 있습니다.
 - 포크에서 온 PR에는 secret이 전달되지 않으므로 실행하지 않습니다.
 
+## 투어 로컬 생성 (본인 Claude Code)
+
+저장소 설정 없이, 패널의 **로컬 Claude Code로 투어 생성** 버튼으로 지금 보고 있는 PR의 투어를 만듭니다. 본인 컴퓨터의 Claude Code와 구독을 쓰므로 API 키나 추가 비용이 없고, 설정 권한이 없는 저장소의 PR에서도 됩니다.
+
+준비 (컴퓨터마다 한 번, macOS와 Linux)
+1. [Claude Code](https://claude.com/claude-code)를 설치하고 로그인합니다.
+2. 이 저장소에서 로컬 도우미를 Chrome에 등록합니다.
+   ```bash
+   npm run install-host
+   ```
+   `~/.pr-docent/`에 실행 스크립트를, Chrome의 `NativeMessagingHosts` 폴더에 `dev.prdocent.host.json`을 만듭니다. 이 확장(ID `hleefogoiedjahnmjgmmgonckaeicppc`)만 연결할 수 있습니다.
+3. `chrome://extensions`에서 확장을 새로고침합니다.
+
+동작 방식
+- 확장이 로그인 세션으로 PR의 diff와 바뀐 파일을 가져와 로컬 도우미(`host/pr-docent-host.mjs`)에 넘깁니다.
+- 도우미가 임시 폴더에서 `claude -p`를 실행합니다. GitHub Actions와 같은 프롬프트와 검사기를 쓰고, Claude는 투어 파일 하나만 쓸 수 있습니다.
+- 검사를 통과한 투어를 이 PR에 저장하고 바로 재생합니다. 생성에는 보통 2~3분이 걸립니다.
+- 제거: `~/.pr-docent/`와 `NativeMessagingHosts/dev.prdocent.host.json`을 지웁니다.
+
 ## 투어 불러오기
 
 - PR 코멘트에 자동 생성된 투어가 있으면 그 투어를 불러옵니다. 직접 불러온 투어가 있으면 그쪽이 우선합니다.

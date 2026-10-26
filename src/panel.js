@@ -2,7 +2,8 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, fetchCommentTour, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, fetchCommentTour, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { generateLocally } from "./generate.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
@@ -21,6 +22,7 @@ export class TourPanel {
     this.settings = { voice: speechAvailable(), rate: 1 };
     this.narrationToken = 0;
     this.status = "";
+    this.generating = null; // progress text while the local generator runs
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
@@ -92,6 +94,38 @@ export class TourPanel {
       this.status = "JSON 형식이 아닙니다.";
       return this.render();
     }
+    await this.useTour(raw);
+  }
+
+  /** Has the user's local Claude Code write a tour for this PR, then plays it. */
+  async generate() {
+    if (this.generating) return;
+    this.generating = "PR 정보를 가져오는 중…";
+    this.status = "";
+    this.render();
+    try {
+      const details = await fetchPullRequestDetails(this.pr);
+      const raw = await generateLocally({ pr: this.pr, ...details }, (progress) => {
+        this.generating = progress.stage === "fetch"
+          ? "diff와 바뀐 파일을 가져오는 중…"
+          : `Claude Code가 투어를 작성하는 중… ${progress.seconds ?? 0}초`;
+        this.render();
+      });
+      this.generating = null;
+      await this.useTour(raw);
+      await this.focusCurrent();
+      this.render();
+    } catch (error) {
+      this.generating = null;
+      this.status = error.notInstalled
+        ? "로컬 도우미가 설치되어 있지 않습니다. pr-docent 저장소에서 npm run install-host를 실행한 뒤 확장을 새로고침하세요."
+        : `투어를 만들지 못했습니다: ${error.message}`;
+      this.render();
+    }
+  }
+
+  /** Validates [raw], saves it for this PR and starts it from the first step. */
+  async useTour(raw) {
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
       this.status = `투어 형식 오류 ${errors.length}건: ${errors.slice(0, 3).join(" / ")}`;
@@ -176,7 +210,8 @@ export class TourPanel {
     if (!this.player) {
       this.panel.innerHTML = `
         ${this.header()}
-        <p class="muted">이 PR의 투어가 없습니다. 투어 JSON 파일을 불러오세요.</p>
+        <p class="muted">이 PR의 투어가 없습니다. 로컬 Claude Code로 만들거나 투어 JSON 파일을 불러오세요.</p>
+        ${this.generateButton()}
         ${this.fileInput()}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}`;
       return this.bind();
@@ -224,7 +259,7 @@ export class TourPanel {
       ${uncovered.length ? `<details class="uncovered"><summary>⚠ 투어가 다루지 않은 파일 ${uncovered.length}개</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
       ${tour.skipped.length ? `<details><summary>건너뛴 파일 ${tour.skipped.length}개</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>단축키</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(what)}</dd>`).join("")}</dl></details>
-      <details><summary>다른 투어 불러오기</summary>${this.fileInput()}</details>`;
+      <details ${this.generating ? "open" : ""}><summary>다른 투어 불러오기</summary>${this.generateButton()}${this.fileInput()}</details>`;
     this.bind();
   }
 
@@ -233,6 +268,10 @@ export class TourPanel {
     const { owner, repo, number } = this.pr;
     return `<header><strong>PR Docent</strong><button class="close" data-action="close" aria-label="닫기">✕</button></header>
       ${onDiff ? "" : `<p class="status">투어는 <a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a> 탭에서 동작합니다.</p>`}`;
+  }
+
+  generateButton() {
+    return `<button class="generate" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? "로컬 Claude Code로 투어 생성")}</button>`;
   }
 
   fileInput() {
@@ -244,6 +283,7 @@ export class TourPanel {
       this.panel.querySelectorAll(`[data-action="${action}"]`).forEach((el) => el.addEventListener(event, handler));
     on("close", "click", () => this.toggleOpen());
     on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
+    on("generate", "click", () => this.generate());
     if (!this.player) return;
     on("prev", "click", () => this.player.previous());
     on("next", "click", () => this.player.next());
@@ -379,6 +419,9 @@ const STYLES = `
   summary { cursor: pointer; font-weight: 600; }
   .uncovered summary { color: var(--fgColor-attention, #9a6700); }
   ul { padding-left: 18px; margin: 6px 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px; word-break: break-all; }
+  .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    border: 0; background: #8250df; color: #fff; font-weight: 600; }
+  .generate:disabled { opacity: .7; cursor: default; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;

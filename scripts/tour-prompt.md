@@ -5,11 +5,12 @@ extension scrolls to each step, highlights its lines and reads the note aloud wi
 synthesizer, pointing at the lines each sentence talks about. Reviewers keep their eyes on the
 code while they listen, so the tour must say what to look at and why, in reading order.
 
-## Inputs (in the current directory, which is the PR's head commit)
+## Inputs
 
-- `{{OUT}}/pr.json`: the PR's title, body, base and head.
+- `{{OUT}}/pr.json`: the PR's title, body and head commit.
 - `{{OUT}}/pr.diff`: the diff exactly as GitHub shows it (3 lines of context).
-- The repository's files at the head commit. Use the Read tool to see line numbers.
+- The current directory: the repository at the head commit (when generated locally, only the
+  files this PR changes). Use the Read tool to see line numbers.
 
 ## Output
 
