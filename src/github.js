@@ -6,6 +6,9 @@
 // - large files are collapsed behind a "Load Diff" button; markdown shows a rendered view
 //   and binaries have no line cells, so those steps fall back to the file itself
 // - changing location.hash does not scroll, so we scroll ourselves
+// - comment bodies are server-rendered (.comment-body) on the Conversation page
+
+import { findTourInBlocks } from "./tour.js";
 
 // Highlights are CSS rules keyed on GitHub's own anchors rather than classes on elements:
 // React re-renders (e.g. after "Load Diff") replace the nodes and would drop our classes.
@@ -34,6 +37,22 @@ export async function sha256Hex(text) {
 }
 
 /** Paths of every file in the PR, read from the diff containers' headers. */
+/**
+ * The tour posted in the PR's comments (by the generate-tour workflow), or null. Reads the
+ * Conversation page with the viewer's own session, so it works on private repositories too.
+ */
+export async function fetchCommentTour(pr) {
+  try {
+    const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
+    if (!response.ok) return null;
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    const blocks = [...page.querySelectorAll(".comment-body pre")].map((pre) => pre.textContent);
+    return findTourInBlocks(blocks, pr);
+  } catch {
+    return null;
+  }
+}
+
 export function listPullRequestFiles() {
   return [...document.querySelectorAll('[id^="diff-"][data-estimated-height]')]
     .map((el) => el.textContent.match(/\u200e([^\u200e]+)\u200e/)?.[1])

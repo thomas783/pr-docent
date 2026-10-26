@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { flattenSteps, narrationUnits, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
+import { findTourInBlocks, flattenSteps, narrationUnits, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
 
 const valid = {
   version: 1,
@@ -98,6 +98,20 @@ describe("narrationUnits", () => {
       { text: "Moves.", lines: null },
       { text: "Point: Check edges.", lines: null },
     ]);
+  });
+});
+
+describe("findTourInBlocks", () => {
+  const pr = { owner: "o", repo: "r", number: 7 };
+  const tour = (number, title) => JSON.stringify({ version: 1, pr: { owner: "o", repo: "r", number }, title });
+
+  it("picks the last tour of this PR and ignores other code blocks", () => {
+    const blocks = ["npm test", "{ not json", tour(7, "old"), tour(8, "other PR"), '{"version":2}', tour(7, "new")];
+    assert.equal(findTourInBlocks(blocks, pr).title, "new");
+  });
+
+  it("returns null when no block is a tour of this PR", () => {
+    assert.equal(findTourInBlocks([tour(8, "x"), "[]"], pr), null);
   });
 });
 

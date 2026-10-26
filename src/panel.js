@@ -2,7 +2,7 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, fetchCommentTour, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
@@ -73,7 +73,8 @@ export class TourPanel {
   async load() {
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
     const stored = await storageGet(`prdocent:tour:${this.key}`);
-    const raw = stored ?? (await fetchBundledTour(this.pr));
+    // A tour loaded by hand wins, then one the generate-tour workflow posted, then a bundled example.
+    const raw = stored ?? (await fetchCommentTour(this.pr)) ?? (await fetchBundledTour(this.pr));
     if (!raw) return;
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
