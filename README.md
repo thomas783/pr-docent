@@ -35,7 +35,7 @@ GitHub의 diff 화면은 화살표 키와 한 글자 단축키를 이미 쓰므�
 ## 투어 불러오기
 
 - `tours/<owner>--<repo>--<number>.json` 파일이 있으면 해당 PR에서 자동으로 불러옵니다.
-- 예제: [`tours/thomas783--keeptabs--7.json`](tours/thomas783--keeptabs--7.json) — [KeepTabs PR #7](https://github.com/thomas783/keeptabs/pull/7/changes)(문의 폼 → GitHub 이슈)을 리뷰하는 투어입니다. 확장을 설치한 뒤 이 PR을 열면 바로 재생해 볼 수 있습니다.
+- 예제: [`tours/thomas783--pr-docent--1.json`](tours/thomas783--pr-docent--1.json) — 이 레포의 [PR #1](https://github.com/thomas783/pr-docent/pull/1/changes)(단축키와 집중 단계 건너뛰기)을 리뷰하는 투어입니다. 확장을 설치한 뒤 이 PR을 열면, PR Docent로 PR Docent 자신의 변경을 리뷰해 볼 수 있습니다.
 - 직접 만든 투어는 같은 폴더에 두면 자동으로 불러오고, 커밋되지 않습니다(`.gitignore` 참고). 공개 예제만 커밋합니다.
 - 그 밖의 PR은 패널의 **투어 JSON 불러오기**로 파일을 선택합니다. 불러온 투어는 그 PR에 저장됩니다.
 
