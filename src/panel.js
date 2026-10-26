@@ -224,6 +224,7 @@ export class TourPanel {
     this.panel.innerHTML = `
       ${this.header()}
       <h2>${esc(tour.title || "리뷰 투어")}</h2>
+      ${this.generateButton("↻ 로컬 Claude Code로 다시 생성", "compact")}
       ${tour.summary ? `<details><summary>PR 요약</summary><p>${esc(tour.summary)}</p></details>` : ""}
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
       <p class="muted">${this.player.index + 1} / ${total} 단계</p>
@@ -259,7 +260,7 @@ export class TourPanel {
       ${uncovered.length ? `<details class="uncovered"><summary>⚠ 투어가 다루지 않은 파일 ${uncovered.length}개</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
       ${tour.skipped.length ? `<details><summary>건너뛴 파일 ${tour.skipped.length}개</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>단축키</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(what)}</dd>`).join("")}</dl></details>
-      <details ${this.generating ? "open" : ""}><summary>다른 투어 불러오기</summary>${this.generateButton()}${this.fileInput()}</details>`;
+      <details><summary>다른 투어 불러오기</summary>${this.fileInput()}</details>`;
     this.bind();
   }
 
@@ -270,8 +271,8 @@ export class TourPanel {
       ${onDiff ? "" : `<p class="status">투어는 <a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a> 탭에서 동작합니다.</p>`}`;
   }
 
-  generateButton() {
-    return `<button class="generate" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? "로컬 Claude Code로 투어 생성")}</button>`;
+  generateButton(label = "로컬 Claude Code로 투어 생성", variant = "") {
+    return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
   fileInput() {
@@ -422,6 +423,8 @@ const STYLES = `
   .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
     border: 0; background: #8250df; color: #fff; font-weight: 600; }
   .generate:disabled { opacity: .7; cursor: default; }
+  .generate.compact { display: inline-block; width: auto; margin: 0 0 4px; padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border: 1px solid #8250df; background: transparent; color: #8250df; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;
