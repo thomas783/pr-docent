@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { EXTENSION_IDS, createDecoder, encodeMessage, extensionIdFromKey, fillTemplate } from "../host/native.mjs";
+import { EXTENSION_IDS, createDecoder, encodeMessage, extensionIdFromKey } from "../host/native.mjs";
 
 describe("native messaging frames", () => {
   it("round-trips messages split and joined across chunks", () => {
@@ -24,11 +24,5 @@ describe("extensionIdFromKey", () => {
   it("derives the fixed ID of this extension from manifest.json", () => {
     const { key } = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
     assert.equal(extensionIdFromKey(key), EXTENSION_IDS[0]);
-  });
-});
-
-describe("fillTemplate", () => {
-  it("fills known placeholders and keeps unknown ones", () => {
-    assert.equal(fillTemplate("{{PR}} in {{LANGUAGE}} {{OTHER}}", { PR: "o/r#1", LANGUAGE: "a|b&c" }), "o/r#1 in a|b&c {{OTHER}}");
   });
 });

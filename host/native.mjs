@@ -33,8 +33,3 @@ export function extensionIdFromKey(key) {
   const hex = createHash("sha256").update(Buffer.from(key, "base64")).digest("hex").slice(0, 32);
   return [...hex].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join("");
 }
-
-/** Replaces {{NAME}} placeholders; unknown ones are left as they are. */
-export function fillTemplate(text, vars) {
-  return text.replace(/{{(\w+)}}/g, (match, name) => (name in vars ? String(vars[name]) : match));
-}

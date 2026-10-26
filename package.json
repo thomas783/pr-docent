@@ -26,6 +26,7 @@
     "bin/",
     "host/",
     "src/diff.js",
+    "src/guidelines.js",
     "src/tour.js",
     "scripts/check-tour.mjs",
     "scripts/tour-prompt.md"
