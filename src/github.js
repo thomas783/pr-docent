@@ -36,7 +36,6 @@ export async function sha256Hex(text) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Paths of every file in the PR, read from the diff containers' headers. */
 /**
  * The tour posted in the PR's comments (by the generate-tour workflow), or null. Reads the
  * Conversation page with the viewer's own session, so it works on private repositories too.
@@ -53,6 +52,7 @@ export async function fetchCommentTour(pr) {
   }
 }
 
+/** Paths of every file in the PR, read from the diff containers' headers. */
 export function listPullRequestFiles() {
   return [...document.querySelectorAll('[id^="diff-"][data-estimated-height]')]
     .map((el) => el.textContent.match(/\u200e([^\u200e]+)\u200e/)?.[1])
@@ -113,12 +113,12 @@ export async function focusStep(step) {
       setHighlight(`${DIM_STYLE}
         ${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} opacity: 1; }
         ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
-      scrollToReadingLine(present[0]);
+      await scrollToReadingLine(firstShown(rows));
       return { found: "lines", count: present.length };
     }
   }
   setHighlight(`#${fileId} { ${FILE_STYLE} }`);
-  scrollToReadingLine(document.getElementById(fileId));
+  await scrollToReadingLine(() => document.getElementById(fileId));
   return { found: "file" };
 }
 
@@ -139,16 +139,38 @@ export async function emphasize(step, lines) {
     ${rows.map((sel) => `html ${sel} > td`).join(",\n")} { ${EMPHASIS_ROW_STYLE} }`);
   const top = present[0].getBoundingClientRect().top;
   const bottom = present.at(-1).getBoundingClientRect().bottom;
-  if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) scrollToReadingLine(present[0]);
+  if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) await scrollToReadingLine(firstShown(rows));
+}
+
+/** Finds the first of [rows] on the page at call time (React may have replaced the nodes). */
+function firstShown(rows) {
+  return () => rows.map((sel) => document.querySelector(sel)).find(Boolean) ?? null;
 }
 
 /**
  * Every step lands at the same height (a quarter down the viewport), so the reader's
  * eyes stay in one place; "start" would also hide the target under GitHub's sticky headers.
  */
-function scrollToReadingLine(element) {
-  const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight * READING_LINE;
-  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+async function scrollToReadingLine(find) {
+  const offset = () => {
+    const element = find();
+    return element ? element.getBoundingClientRect().top - window.innerHeight * READING_LINE : null;
+  };
+  const first = offset();
+  if (first === null || Math.abs(first) < 24) return;
+  window.scrollTo({ top: Math.max(0, window.scrollY + first), behavior: "smooth" });
+  await new Promise((resolve) => {
+    window.addEventListener("scrollend", resolve, { once: true });
+    setTimeout(resolve, 1500);
+  });
+  // Files between the start and the target render lazily as they scroll past and grow,
+  // pushing the target down; follow it until it stays put.
+  for (let i = 0; i < 5; i++) {
+    const drift = offset();
+    if (drift === null || Math.abs(drift) < 24 || window.scrollY + drift < 0) return;
+    window.scrollTo({ top: window.scrollY + drift, behavior: "instant" });
+    await sleep(300);
+  }
 }
 
 export function clearHighlight() {
