@@ -4,6 +4,7 @@
 
 import { clearHighlight, emphasize, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
+import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
 import { narrationUnits, parseTour, tourFileName, uncoveredFiles } from "./tour.js";
 
@@ -28,7 +29,18 @@ export class TourPanel {
     this.panel = this.root.querySelector(".panel");
     this.unitIndex = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
+    this.onKeyDown = (event) => this.handleShortcut(event);
+    document.addEventListener("keydown", this.onKeyDown, true);
     document.body.append(this.host);
+  }
+
+  handleShortcut(event) {
+    if (this.panel.hidden || !this.player) return;
+    const action = actionForKey(event);
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.player[action]();
   }
 
   async toggleOpen() {
@@ -49,6 +61,7 @@ export class TourPanel {
   }
 
   destroy() {
+    document.removeEventListener("keydown", this.onKeyDown, true);
     this.stop();
     clearHighlight();
     reservePageSpace(false);
@@ -193,6 +206,10 @@ export class TourPanel {
         <button class="primary" data-action="toggle">${this.player.playing ? "❚❚ 일시정지" : "▶ 재생"}</button>
         <button data-action="next" ${this.player.isLast ? "disabled" : ""}>다음 ▶</button>
       </div>
+      <div class="controls focus-nav">
+        <button data-action="previousFocus" ${this.player.findFocus(-1) < 0 ? "disabled" : ""}>⏮ 이전 집중</button>
+        <button data-action="nextFocus" ${this.player.findFocus(1) < 0 ? "disabled" : ""}>다음 집중 ⏭</button>
+      </div>
       <div class="settings">
         <label><input type="checkbox" data-action="voice" ${this.settings.voice ? "checked" : ""} ${speechAvailable() ? "" : "disabled"}> 음성 안내</label>
         <select data-action="rate">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
@@ -205,6 +222,7 @@ export class TourPanel {
 
       ${uncovered.length ? `<details class="uncovered"><summary>⚠ 투어가 다루지 않은 파일 ${uncovered.length}개</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
       ${tour.skipped.length ? `<details><summary>건너뛴 파일 ${tour.skipped.length}개</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
+      <details><summary>단축키</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(what)}</dd>`).join("")}</dl></details>
       <details><summary>다른 투어 불러오기</summary>${this.fileInput()}</details>`;
     this.bind();
   }
@@ -228,6 +246,8 @@ export class TourPanel {
     if (!this.player) return;
     on("prev", "click", () => this.player.previous());
     on("next", "click", () => this.player.next());
+    on("previousFocus", "click", () => this.player.previousFocus());
+    on("nextFocus", "click", () => this.player.nextFocus());
     on("toggle", "click", () => this.player.toggle());
     on("refocus", "click", () => this.focusCurrent().then(() => this.render()));
     on("voice", "change", (e) => this.updateSettings({ voice: e.target.checked }));
@@ -344,6 +364,11 @@ const STYLES = `
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }
   .controls button.primary { background: #8250df; border-color: #8250df; color: #fff; }
   .controls button:disabled { opacity: .4; cursor: default; }
+  .focus-nav { margin-top: 6px; }
+  .focus-nav button { font-size: 12px; }
+  .shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; }
+  .shortcuts dt { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .shortcuts dd { margin: 0; color: var(--fgColor-muted, #59636e); }
   .settings { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
   .chapters { margin: 0; padding-left: 20px; }
   .chapters li { padding: 4px 0; cursor: pointer; }
