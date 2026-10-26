@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checkTour, formatRanges, visibleLines } from "../src/diff.js";
+import { changedLineCount, checkTour, formatRanges, visibleLines } from "../src/diff.js";
 import { parseTour } from "../src/tour.js";
 
 const diff = `diff --git a/src/a.js b/src/a.js
@@ -82,6 +82,20 @@ describe("checkTour", () => {
       'img/logo.png: changed but neither visited by a step nor listed in "skipped"',
       'gone.txt: changed but neither visited by a step nor listed in "skipped"',
     ]);
+  });
+});
+
+describe("changedLineCount", () => {
+  it("counts added and removed lines, not headers or context", () => {
+    assert.equal(changedLineCount(diff), 6);
+  });
+});
+
+describe("repeated steps", () => {
+  it("are reported", () => {
+    const step = { file: "src/a.js", lines: [10, 11] };
+    const errors = checkTour(tourWith([step, step], [{ file: "img/logo.png" }, { file: "gone.txt" }]), visibleLines(diff));
+    assert.deepEqual(errors, ["chapters[0].steps[1] (src/a.js): repeats an earlier step on the same lines"]);
   });
 });
 

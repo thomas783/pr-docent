@@ -1,18 +1,24 @@
 #!/usr/bin/env node
 // Validates a tour against a pull request diff.
 //
-//   node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]
+//   node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number] [--guidelines <file>]
 //
 // Prints every problem and exits 1, or prints a one-line summary and exits 0.
 // The diff must use 3 lines of context (`gh pr diff` or `git diff -U3`), as GitHub does.
+// --guidelines points at a copy of the repository's .github/pr-docent.md; a missing file means
+// the default limits.
 
-import { readFileSync } from "node:fs";
-import { checkTour, visibleLines } from "../src/diff.js";
+import { existsSync, readFileSync } from "node:fs";
+import { changedLineCount, checkTour, visibleLines } from "../src/diff.js";
+import { checkBrevity, parseGuidelines } from "../src/guidelines.js";
 import { flattenSteps, parseTour } from "../src/tour.js";
 
-const [tourPath, diffPath, expectedPr] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const flag = args.indexOf("--guidelines");
+const guidelinesPath = flag >= 0 ? args.splice(flag, 2)[1] : null;
+const [tourPath, diffPath, expectedPr] = args;
 if (!tourPath || !diffPath) {
-  console.error("usage: node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]");
+  console.error("usage: node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number] [--guidelines <file>]");
   process.exit(2);
 }
 
@@ -37,7 +43,13 @@ if (expectedPr) {
   if (actual !== expectedPr) fail([`pr is ${actual}, expected ${expectedPr}`]);
 }
 
-const problems = checkTour(tour, visibleLines(readFileSync(diffPath, "utf8")));
+const diff = readFileSync(diffPath, "utf8");
+const guidelines = parseGuidelines(guidelinesPath && existsSync(guidelinesPath) ? readFileSync(guidelinesPath, "utf8") : "");
+if (guidelines.errors.length) fail(guidelines.errors.map((error) => `.github/pr-docent.md: ${error}`));
+const problems = [
+  ...checkTour(tour, visibleLines(diff)),
+  ...checkBrevity(tour, { changedLines: changedLineCount(diff), limits: guidelines.limits }),
+];
 if (problems.length) fail(problems);
 
 console.log(`OK: ${tour.chapters.length} chapters, ${flattenSteps(tour).length} steps, ${tour.skipped.length} skipped files`);
