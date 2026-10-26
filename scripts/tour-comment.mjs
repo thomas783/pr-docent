@@ -7,6 +7,7 @@
 // The first line marks the comment so the workflow updates it instead of posting a new one.
 
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { flattenSteps, parseTour } from "../src/tour.js";
 
 export const MARKER = "<!-- pr-docent:tour -->";
@@ -45,7 +46,7 @@ export function renderComment(raw) {
   return body;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [tourPath] = process.argv.slice(2);
   if (!tourPath) {
     console.error("usage: node scripts/tour-comment.mjs <tour.json>");
