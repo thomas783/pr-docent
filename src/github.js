@@ -10,8 +10,16 @@
 // Highlights are CSS rules keyed on GitHub's own anchors rather than classes on elements:
 // React re-renders (e.g. after "Load Diff") replace the nodes and would drop our classes.
 const HIGHLIGHT_STYLE_ID = "prdocent-highlight";
+const EMPHASIS_STYLE_ID = "prdocent-emphasis";
 const ROW_STYLE = "background-color: rgba(130, 80, 223, 0.16) !important;";
 const FILE_STYLE = "outline: 3px solid #8250df; outline-offset: 2px; border-radius: 6px;";
+const READING_LINE = 0.25;
+// Spotlight: every other diff cell fades so only the step's lines stand out. The step's rows
+// win because their selector is more specific (the :has() argument counts).
+const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.2; transition: opacity 0.3s, background-color 0.3s; }`;
+// Emphasis: the lines the narration is talking about right now, inside the step's range.
+const EMPHASIS_ROW_STYLE = "background-color: rgba(130, 80, 223, 0.36) !important; opacity: 1;";
+const STICKY_HEADER_HEIGHT = 80;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
 export function parsePullRequestPath(pathname) {
@@ -72,6 +80,7 @@ export function rowSelectors(hash, side, [start, end]) {
 export async function focusStep(step) {
   const hash = await sha256Hex(step.file);
   const fileId = `diff-${hash}`;
+  setStyle(EMPHASIS_STYLE_ID, "");
   if (!document.getElementById(fileId)) {
     setHighlight("");
     return { found: "none" };
@@ -82,26 +91,61 @@ export async function focusStep(step) {
     const rows = rowSelectors(hash, step.side, step.lines);
     const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
     if (present.length) {
-      setHighlight(`${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} }
+      setHighlight(`${DIM_STYLE}
+        ${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} opacity: 1; }
         ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
-      present[0].scrollIntoView({ block: present.length > 12 ? "start" : "center", behavior: "smooth" });
+      scrollToReadingLine(present[0]);
       return { found: "lines", count: present.length };
     }
   }
   setHighlight(`#${fileId} { ${FILE_STYLE} }`);
-  document.getElementById(fileId).scrollIntoView({ block: "start", behavior: "smooth" });
+  scrollToReadingLine(document.getElementById(fileId));
   return { found: "file" };
+}
+
+/**
+ * Points at [lines] within the focused step while the narration talks about them: those rows
+ * get a stronger tint and the rest of the step fades a little. null clears the emphasis.
+ * Scrolls only when the lines aren't fully on screen, so the view stays put within a step.
+ */
+export async function emphasize(step, lines) {
+  if (!lines || !step.lines) return setStyle(EMPHASIS_STYLE_ID, "");
+  const hash = await sha256Hex(step.file);
+  const rows = rowSelectors(hash, step.side, lines);
+  const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
+  if (!present.length) return setStyle(EMPHASIS_STYLE_ID, "");
+  const stepRows = rowSelectors(hash, step.side, step.lines);
+  // "html" makes these rules more specific than the step highlight, whatever the style order.
+  setStyle(EMPHASIS_STYLE_ID, `${stepRows.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 0.45; }
+    ${rows.map((sel) => `html ${sel} > td`).join(",\n")} { ${EMPHASIS_ROW_STYLE} }`);
+  const top = present[0].getBoundingClientRect().top;
+  const bottom = present.at(-1).getBoundingClientRect().bottom;
+  if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) scrollToReadingLine(present[0]);
+}
+
+/**
+ * Every step lands at the same height (a quarter down the viewport), so the reader's
+ * eyes stay in one place; "start" would also hide the target under GitHub's sticky headers.
+ */
+function scrollToReadingLine(element) {
+  const top = element.getBoundingClientRect().top + window.scrollY - window.innerHeight * READING_LINE;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
 }
 
 export function clearHighlight() {
   setHighlight("");
+  setStyle(EMPHASIS_STYLE_ID, "");
 }
 
 function setHighlight(css) {
-  let style = document.getElementById(HIGHLIGHT_STYLE_ID);
+  setStyle(HIGHLIGHT_STYLE_ID, css);
+}
+
+function setStyle(id, css) {
+  let style = document.getElementById(id);
   if (!style) {
     style = document.createElement("style");
-    style.id = HIGHLIGHT_STYLE_ID;
+    style.id = id;
     document.head.append(style);
   }
   style.textContent = css;

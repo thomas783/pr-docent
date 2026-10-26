@@ -2,14 +2,15 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { Player } from "./player.js";
-import { speak, speechAvailable, stopSpeaking } from "./speech.js";
-import { parseTour, readingSeconds, tourFileName, uncoveredFiles } from "./tour.js";
+import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
+import { narrationUnits, parseTour, tourFileName, uncoveredFiles } from "./tour.js";
 
 const LEVEL_LABEL = { focus: "집중", skim: "훑기", skip: "생략 가능" };
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
+const POINT_LABEL = "리뷰 포인트";
 
 export class TourPanel {
   constructor(pr) {
@@ -25,6 +26,7 @@ export class TourPanel {
     this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">▶ PR Docent</button><aside class="panel" hidden></aside>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
+    this.unitIndex = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
     document.body.append(this.host);
   }
@@ -34,9 +36,16 @@ export class TourPanel {
     this.panel.hidden = !opening;
     this.launcher.classList.toggle("active", opening);
     reservePageSpace(opening);
-    if (!opening) return this.stop();
+    if (!opening) {
+      this.stop();
+      return clearHighlight();
+    }
     if (!this.player) await this.load();
     this.render();
+    if (this.player) {
+      await this.focusCurrent();
+      this.render();
+    }
   }
 
   destroy() {
@@ -113,16 +122,31 @@ export class TourPanel {
         : "";
   }
 
-  async narrate() {
+  /**
+   * Reads the step one sentence at a time, pointing at the lines each sentence talks about.
+   * [from] says where to start ({ unit, char }), used to resume mid-step after a rate change.
+   */
+  async narrate(from = { unit: 0, char: 0 }) {
     const token = ++this.narrationToken;
     const step = this.player.current;
-    const text = (this.player.startsChapter ? `${step.chapterTitle}. ` : "") + step.note;
-    if (this.settings.voice) {
-      await speak(text, { rate: this.settings.rate });
-    } else {
-      await sleep((readingSeconds(text) * 1000) / this.settings.rate);
+    const units = narrationUnits(step, {
+      chapterTitle: this.player.startsChapter ? step.chapterTitle : "",
+      pointLabel: POINT_LABEL,
+    });
+    for (let i = from.unit; i < units.length; i++) {
+      this.unitIndex = i;
+      const { text, lines } = units[i];
+      const offset = i === from.unit ? from.char : 0;
+      await emphasize(step, lines);
+      if (token !== this.narrationToken) return;
+      if (this.settings.voice) {
+        await speak(text, { rate: this.settings.rate, from: offset });
+      } else {
+        await sleep((Math.max(1.5, text.slice(offset).length / 12) * 1000) / this.settings.rate);
+      }
+      if (token !== this.narrationToken) return;
     }
-    if (token === this.narrationToken && this.player.playing) this.player.next();
+    if (this.player.playing) this.player.next();
   }
 
   stop() {
@@ -160,6 +184,7 @@ export class TourPanel {
         <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}</p>
         <span class="level ${step.level}">${LEVEL_LABEL[step.level]}</span>
         <p class="note">${esc(step.note)}</p>
+        ${step.point ? `<p class="point"><b>${POINT_LABEL}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
 
@@ -215,7 +240,14 @@ export class TourPanel {
   updateSettings(patch) {
     this.settings = { ...this.settings, ...patch };
     storageSet(SETTINGS_KEY, this.settings);
+    // An utterance's rate can't change once it has started, so a rate change continues
+    // from the word being read with a new utterance. narrate() bumps the token, so the
+    // old reading won't advance the step.
     if (!this.settings.voice) stopSpeaking();
+    if (this.player?.playing) {
+      const char = "rate" in patch && this.settings.voice ? spokenIndex() : 0;
+      this.narrate({ unit: this.unitIndex, char });
+    }
   }
 }
 
@@ -304,6 +336,9 @@ const STYLES = `
   .level.skim { background: #ddf4ff; color: #0550ae; }
   .level.skip { background: #eff2f5; color: #59636e; }
   .note { white-space: pre-wrap; }
+  .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
+    background: var(--bgColor-attention-muted, #fff8c5); }
+  .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
   .controls { display: flex; gap: 6px; margin-top: 10px; }
   .controls button { flex: 1; padding: 6px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }

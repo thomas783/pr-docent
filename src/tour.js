@@ -6,12 +6,14 @@
 //   "pr": { "owner": "your-org", "repo": "your-repo", "number": 42 },
 //   "title": "...", "summary": "...",
 //   "chapters": [{ "title": "...", "summary": "...", "steps": [
-//     { "file": "path/in/repo.kt", "lines": [10, 24], "side": "right", "level": "focus", "note": "..." }
+//     { "file": "path/in/repo.kt", "lines": [10, 24], "side": "right", "level": "focus", "note": "...", "point": "..." }
 //   ]}],
 //   "skipped": [{ "file": "server/gradlew", "reason": "generated wrapper" }]
 // }
 // lines and side are optional (without lines the step points at the whole file);
-// level is focus | skim | skip.
+// level is focus | skim | skip; point (optional) is what the reviewer should check.
+// note is a string, or a list of beats that each point at the lines they talk about:
+//   "note": [{ "text": "findFocus finds ...", "lines": [58, 63] }, { "text": "..." }]
 
 export const LEVELS = ["focus", "skim", "skip"];
 
@@ -32,20 +34,15 @@ export function parseTour(raw) {
     const steps = (chapter.steps || []).map((step, s) => {
       const where = `chapters[${c}].steps[${s}]`;
       if (typeof step.file !== "string" || !step.file) fail(`${where}.file is required`);
-      let lines = null;
-      if (step.lines !== undefined) {
-        const [start, end] = Array.isArray(step.lines) ? step.lines : [];
-        if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
-          fail(`${where}.lines must be [start, end] with 1 <= start <= end`);
-        } else {
-          lines = [start, end];
-        }
-      }
+      const lines = parseLines(step.lines, where, fail);
       const side = step.side ?? "right";
       if (side !== "left" && side !== "right") fail(`${where}.side must be "left" or "right"`);
       const level = step.level ?? "skim";
       if (!LEVELS.includes(level)) fail(`${where}.level must be one of ${LEVELS.join(", ")}`);
-      return { file: step.file, lines, side, level, note: String(step.note ?? "") };
+      if (step.point !== undefined && typeof step.point !== "string") fail(`${where}.point must be a string`);
+      const beats = parseBeats(step.note, where, fail);
+      const note = beats.map((beat) => beat.text).join(" ");
+      return { file: step.file, lines, side, level, note, beats, point: step.point ?? "" };
     });
     return { title: String(chapter.title ?? ""), summary: String(chapter.summary ?? ""), steps };
   });
@@ -63,6 +60,27 @@ export function parseTour(raw) {
     },
     errors: [],
   };
+}
+
+/** [start, end] line range, or null when absent; reports a malformed one through [fail]. */
+function parseLines(value, where, fail) {
+  if (value === undefined) return null;
+  const [start, end] = Array.isArray(value) ? value : [];
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
+    fail(`${where}.lines must be [start, end] with 1 <= start <= end`);
+    return null;
+  }
+  return [start, end];
+}
+
+/** A note as beats: a plain string is one beat that points at no particular lines. */
+function parseBeats(note, where, fail) {
+  if (!Array.isArray(note)) return note ? [{ text: String(note), lines: null }] : [];
+  return note.map((beat, b) => {
+    const at = `${where}.note[${b}]`;
+    if (typeof beat?.text !== "string" || !beat.text) fail(`${at}.text is required`);
+    return { text: String(beat?.text ?? ""), lines: parseLines(beat?.lines, at, fail) };
+  });
 }
 
 /** Every step in order, with its chapter index and its position inside the chapter. */
@@ -84,6 +102,44 @@ export function uncoveredFiles(tour, prFiles) {
 /** Seconds a step stays on screen when narration is off: roughly reading speed, at least 4s. */
 export function readingSeconds(text) {
   return Math.max(4, Math.round(String(text).length / 12));
+}
+
+/**
+ * Splits narration into sentences, each with its offset in [text], so it can be read (and
+ * resumed) a sentence at a time. A period after a digit ("2. 집중 단계") is a list number,
+ * not a sentence end.
+ */
+export function splitSentences(text) {
+  const sentences = [];
+  const pattern = /[^\d\s][.!?](?=\s)/g;
+  let start = 0;
+  for (let match; (match = pattern.exec(text)); ) {
+    const end = match.index + match[0].length;
+    pushSentence(sentences, text, start, end);
+    start = end;
+  }
+  pushSentence(sentences, text, start, text.length);
+  return sentences;
+}
+
+function pushSentence(sentences, text, start, end) {
+  const raw = text.slice(start, end);
+  const trimmed = raw.trim();
+  if (trimmed) sentences.push({ start: start + raw.indexOf(trimmed), text: trimmed });
+}
+
+/**
+ * What to say for a step, one sentence per unit, each with the lines to point at while it
+ * is read (null: just the step's own range). Opens with the chapter title when given and
+ * ends with the review point.
+ */
+export function narrationUnits(step, { chapterTitle = "", pointLabel = "" } = {}) {
+  const units = [];
+  const add = (text, lines) => splitSentences(text).forEach((s) => units.push({ text: s.text, lines }));
+  if (chapterTitle) add(`${chapterTitle}.`, null);
+  for (const beat of step.beats) add(beat.text, beat.lines);
+  if (step.point) add(`${pointLabel}: ${step.point}`, null);
+  return units;
 }
 
 /** The bundled tour file name for a PR, e.g. "your-org--your-repo--42.json". */
