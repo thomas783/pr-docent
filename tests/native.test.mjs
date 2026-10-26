@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createDecoder, encodeMessage, extensionIdFromKey, fillTemplate } from "../host/native.mjs";
+import { EXTENSION_IDS, createDecoder, encodeMessage, extensionIdFromKey, fillTemplate } from "../host/native.mjs";
 
 describe("native messaging frames", () => {
   it("round-trips messages split and joined across chunks", () => {
@@ -23,7 +23,7 @@ describe("native messaging frames", () => {
 describe("extensionIdFromKey", () => {
   it("derives the fixed ID of this extension from manifest.json", () => {
     const { key } = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
-    assert.equal(extensionIdFromKey(key), "hleefogoiedjahnmjgmmgonckaeicppc");
+    assert.equal(extensionIdFromKey(key), EXTENSION_IDS[0]);
   });
 });
 

@@ -77,18 +77,18 @@ PR이 열리거나 커밋이 추가될 때마다 Claude Code가 diff를 읽고 �
 
 준비 (컴퓨터마다 한 번, macOS와 Linux)
 1. [Claude Code](https://claude.com/claude-code)를 설치하고 로그인합니다.
-2. 이 저장소에서 로컬 도우미를 Chrome에 등록합니다.
+2. 로컬 도우미를 Chrome에 등록합니다. Node.js 18 이상이 필요합니다.
    ```bash
-   npm run install-host
+   npx pr-docent install
    ```
-   `~/.pr-docent/`에 실행 스크립트를, Chrome의 `NativeMessagingHosts` 폴더에 `dev.prdocent.host.json`을 만듭니다. 이 확장(ID `hleefogoiedjahnmjgmmgonckaeicppc`)만 연결할 수 있습니다.
+   `~/.pr-docent/`에 도우미 파일과 실행 스크립트를 복사하고, Chrome의 `NativeMessagingHosts` 폴더에 `dev.prdocent.host.json`을 만듭니다. 이 확장(ID `hleefogoiedjahnmjgmmgonckaeicppc`)만 연결할 수 있으며, 다른 ID는 `--extension-id <ID>`로 추가합니다. 이 저장소에서는 `npm run install-host`도 같습니다.
 3. `chrome://extensions`에서 확장을 새로고침합니다.
 
 동작 방식
 - 확장이 로그인 세션으로 PR의 diff와 바뀐 파일을 가져와 로컬 도우미(`host/pr-docent-host.mjs`)에 넘깁니다.
 - 도우미가 임시 폴더에서 `claude -p`를 실행합니다. GitHub Actions와 같은 프롬프트와 검사기를 쓰고, Claude는 투어 파일 하나만 쓸 수 있습니다.
 - 검사를 통과한 투어를 이 PR에 저장하고 바로 재생합니다. 생성에는 보통 2~3분이 걸립니다.
-- 제거: `~/.pr-docent/`와 `NativeMessagingHosts/dev.prdocent.host.json`을 지웁니다.
+- 제거: `npx pr-docent uninstall`
 
 ## 투어 불러오기
 
