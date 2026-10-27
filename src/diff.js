@@ -43,16 +43,20 @@ export function visibleLines(diffText) {
 
 /**
  * Problems that would make the tour point at the wrong place or skip part of the PR:
- * files outside the diff, lines not shown on the page, beats outside their step, and
- * changed files the tour neither visits nor skips.
+ * files outside the diff, lines not shown on the page, beats outside their step, repeated
+ * steps, and changed files the tour neither visits nor skips.
  */
 export function checkTour(tour, files) {
   const errors = [];
   const visited = new Set();
+  const seen = new Set();
   tour.chapters.forEach((chapter, c) =>
     chapter.steps.forEach((step, s) => {
       const where = `chapters[${c}].steps[${s}] (${step.file})`;
       visited.add(step.file);
+      const key = `${step.file}|${step.side}|${step.lines}`;
+      if (seen.has(key)) errors.push(`${where}: repeats an earlier step on the same lines`);
+      seen.add(key);
       const file = files.get(step.file);
       if (!file) return errors.push(`${where}: file is not changed in this pull request`);
       const shown = file[step.side];
@@ -78,6 +82,18 @@ export function checkTour(tour, files) {
     if (!visited.has(path)) errors.push(`${path}: changed but neither visited by a step nor listed in "skipped"`);
   }
   return errors;
+}
+
+/** Added plus removed lines, which sets how long a tour of the diff may be. */
+export function changedLineCount(diffText) {
+  let count = 0;
+  let inHunk = false;
+  for (const line of String(diffText).split("\n")) {
+    if (line.startsWith("diff --git ")) inHunk = false;
+    else if (line.startsWith("@@")) inHunk = true;
+    else if (inHunk && (line.startsWith("+") || line.startsWith("-"))) count++;
+  }
+  return count;
 }
 
 function range([start, end]) {

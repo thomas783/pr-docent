@@ -16,7 +16,7 @@ code while they listen, so the tour must say what to look at and why, in reading
 
 Write the tour to `{{OUT}}/tour.json`, then run
 
-    node {{TOOLS}}/scripts/check-tour.mjs {{OUT}}/tour.json {{OUT}}/pr.diff {{PR}}
+    node {{TOOLS}}/scripts/check-tour.mjs {{OUT}}/tour.json {{OUT}}/pr.diff {{PR}} --guidelines {{OUT}}/guidelines.md
 
 and fix every problem it reports until it prints `OK`. Then stop. Do not post comments or
 change any other file. Use these absolute paths as written and do not change directory:
@@ -55,12 +55,23 @@ change any other file. Use these absolute paths as written and do not change dir
 
 ## Rules
 
+Be brief. Reviewers listen while they look at the code, so every sentence must earn its place.
+The checker enforces these limits for this diff ({{CHANGED_LINES}} changed lines):
+- At most {{MAX_STEPS}} steps in total.
+- At most {{SENTENCES_PER_STEP}} sentences per step, each at most {{SENTENCE_CHARS}} characters.
+- `point`: one question, at most {{POINT_CHARS}} characters.
+- `summary`: at most {{SUMMARY_CHARS}} characters; each chapter `summary`: at most
+  {{CHAPTER_SUMMARY_CHARS}}.
+
 Coverage and order
-- Every changed file must be visited by a step or listed in `skipped` with a reason
-  (lock files, generated code, snapshots, pure renames, binaries).
+- Every changed file must be visited by a step or listed in `skipped` with a short reason.
+- Make steps only for changes a reviewer must think about. Put trivial changes in `skipped`
+  instead of steps: comment or doc-comment edits, imports, docs, test fixtures that pass values
+  through, lock files, generated code, renames, binaries. A file can have a step for its real
+  change and nothing for its trivial ones.
+- Merge neighbouring changes that make one point into one step; never repeat a step.
 - Order chapters the way a person should read the change, not by file path: what changes and
-  why, then the core logic, then how it is wired in, then tests and docs.
-- A large file may need several steps; a trivial one may share a chapter with related files.
+  why, then the core logic, then how it is wired in, then tests.
 
 Lines
 - `lines` are line numbers in the new file (`"side": "right"`, the default). Use
@@ -72,13 +83,16 @@ Lines
   step as a whole.
 
 Notes are spoken aloud
-- Write in {{LANGUAGE}}. One or two short sentences per note entry, 2-5 entries per step.
-- Say what the code does and why it matters for the change; do not read the code out.
+- Write in {{LANGUAGE}}. One sentence per note entry, one idea per sentence.
+- Say why the change matters: intent, risk, or how it connects to other code. Do not restate
+  what the code plainly shows ("adds a parameter", "imports X", "updates the comment").
 - Avoid symbols, brackets and long lists that sound bad in speech. Name identifiers as written.
 
 Levels and review points
 - `focus`: where a bug would hurt or a design decision is made; at most about a third of the
-  steps. `skim`: worth a look. `skip`: can be skipped safely (formatting, boilerplate).
-- `point` is a concrete question for the reviewer, grounded in the code you read: an edge case,
-  a failure mode, a contract another caller relies on. Leave it out when there is nothing real
-  to check. Never invent problems.
+  steps. `skim`: worth a look.
+- `point` is one concrete question for the reviewer, grounded in the code you read: an edge
+  case, a failure mode, a contract another caller relies on. Leave it out when there is nothing
+  real to check. Never invent problems.
+
+{{GUIDELINES}}

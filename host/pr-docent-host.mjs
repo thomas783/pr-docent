@@ -8,9 +8,10 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkTour, visibleLines } from "../src/diff.js";
+import { changedLineCount, checkTour, visibleLines } from "../src/diff.js";
+import { buildPrompt, checkBrevity, parseGuidelines } from "../src/guidelines.js";
 import { parseTour } from "../src/tour.js";
-import { createDecoder, encodeMessage, fillTemplate } from "./native.mjs";
+import { createDecoder, encodeMessage } from "./native.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG = readConfig();
@@ -35,7 +36,7 @@ process.stdin.on("end", () => {
   process.exit(0);
 });
 
-async function generate({ pr, title, body, headSha, diff, files, model, language }) {
+async function generate({ pr, title, body, headSha, diff, files, guidelines = "", model, language }) {
   // Real path: on macOS the temp folder is a symlink, and the write rule must match exactly.
   const work = realpathSync(mkdtempSync(join(tmpdir(), "pr-docent-")));
   try {
@@ -51,13 +52,19 @@ async function generate({ pr, title, body, headSha, diff, files, model, language
     }
     writeFileSync(join(out, "pr.diff"), diff);
     writeFileSync(join(out, "pr.json"), JSON.stringify({ title, body, headRefOid: headSha }, null, 2));
+    if (guidelines) writeFileSync(join(out, "guidelines.md"), guidelines);
+    const { limits, errors: guidelineErrors } = parseGuidelines(guidelines);
+    if (guidelineErrors.length) throw new Error(`.github/pr-docent.md: ${guidelineErrors.join(" / ")}`);
+    const changedLines = changedLineCount(diff);
 
     const prRef = `${pr.owner}/${pr.repo}#${pr.number}`;
-    const prompt = fillTemplate(readFileSync(join(ROOT, "scripts", "tour-prompt.md"), "utf8"), {
-      PR: prRef,
-      OUT: out,
-      TOOLS: ROOT,
-      LANGUAGE: language || "한국어",
+    const prompt = buildPrompt(readFileSync(join(ROOT, "scripts", "tour-prompt.md"), "utf8"), {
+      pr: prRef,
+      out,
+      tools: ROOT,
+      language: language || "한국어",
+      changedLines,
+      guidelinesText: guidelines,
     });
     await runClaude(prompt, repo, [
       "--model", model || "claude-opus-5-5",
@@ -72,7 +79,9 @@ async function generate({ pr, title, body, headSha, diff, files, model, language
       throw new Error("Claude did not write a tour file.");
     }
     const { tour, errors } = parseTour(raw);
-    const problems = errors.length ? errors : checkTour(tour, visibleLines(diff));
+    const problems = errors.length
+      ? errors
+      : [...checkTour(tour, visibleLines(diff)), ...checkBrevity(tour, { changedLines, limits })];
     if (problems.length) throw new Error(`The tour did not pass the checks: ${problems.slice(0, 3).join(" / ")}`);
     return raw;
   } finally {

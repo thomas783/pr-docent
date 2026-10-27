@@ -4,6 +4,7 @@
 // session covers private repositories), then hands them to the native host.
 
 import { visibleLines } from "./diff.js";
+import { GUIDELINES_PATH } from "./guidelines.js";
 
 const HOST_NAME = "dev.prdocent.host";
 const MAX_FILE_BYTES = 1_000_000;
@@ -26,6 +27,9 @@ async function generate(port, { pr, title, body, headSha, language }) {
     if (text !== null && text.length <= MAX_FILE_BYTES && !text.includes("\u0000")) files[path] = text;
   });
 
+  // The repository's own instructions for tours, if it has any.
+  const guidelines = await fetchText(`${base}/raw/${headSha}/${GUIDELINES_PATH}`).catch(() => "");
+
   port.postMessage({ type: "progress", stage: "claude", seconds: 0 });
   const host = chrome.runtime.connectNative(HOST_NAME);
   host.onMessage.addListener((message) => port.postMessage(message));
@@ -34,7 +38,7 @@ async function generate(port, { pr, title, body, headSha, language }) {
     if (error) port.postMessage({ type: "error", message: error, notInstalled: /not found/i.test(error) });
   });
   port.onDisconnect.addListener(() => host.disconnect());
-  host.postMessage({ type: "generate", pr, title, body, headSha, diff, files, language });
+  host.postMessage({ type: "generate", pr, title, body, headSha, diff, files, guidelines, language });
 }
 
 async function fetchText(url) {

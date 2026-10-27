@@ -17,7 +17,7 @@ import { EXTENSION_IDS, HOST_NAME } from "../host/native.mjs";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // What the host needs at run time; everything else in the package is for the extension or tests.
-const RUNTIME_FILES = ["host/native.mjs", "host/pr-docent-host.mjs", "src/diff.js", "src/tour.js", "scripts/check-tour.mjs", "scripts/tour-prompt.md"];
+const RUNTIME_FILES = ["host/native.mjs", "host/pr-docent-host.mjs", "src/diff.js", "src/guidelines.js", "src/tour.js", "scripts/check-tour.mjs", "scripts/tour-prompt.md"];
 const HOSTS_DIRS = {
   darwin: join(homedir(), "Library", "Application Support", "Google", "Chrome", "NativeMessagingHosts"),
   linux: join(homedir(), ".config", "google-chrome", "NativeMessagingHosts"),
