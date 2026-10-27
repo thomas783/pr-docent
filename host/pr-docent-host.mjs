@@ -69,11 +69,11 @@ async function generate({ pr, title, body, headSha, diff, files, model, language
     try {
       raw = JSON.parse(readFileSync(join(out, "tour.json"), "utf8"));
     } catch {
-      throw new Error("Claude가 투어 파일을 만들지 못했습니다.");
+      throw new Error("Claude did not write a tour file.");
     }
     const { tour, errors } = parseTour(raw);
     const problems = errors.length ? errors : checkTour(tour, visibleLines(diff));
-    if (problems.length) throw new Error(`투어 검사를 통과하지 못했습니다: ${problems.slice(0, 3).join(" / ")}`);
+    if (problems.length) throw new Error(`The tour did not pass the checks: ${problems.slice(0, 3).join(" / ")}`);
     return raw;
   } finally {
     rmSync(work, { recursive: true, force: true });
@@ -99,12 +99,12 @@ function runClaude(prompt, cwd, args) {
     child.stderr.on("data", keep);
     const progress = setInterval(() => send({ type: "progress", seconds: Math.round((Date.now() - started) / 1000) }), 5000);
     const timeout = setTimeout(() => child.kill(), TIMEOUT_MS);
-    child.on("error", (error) => reject(new Error(`Claude Code를 실행하지 못했습니다 (${CONFIG.claude}): ${error.message}`)));
+    child.on("error", (error) => reject(new Error(`Could not start Claude Code (${CONFIG.claude}): ${error.message}`)));
     child.on("close", (code) => {
       clearInterval(progress);
       clearTimeout(timeout);
       if (code === 0) resolvePromise();
-      else reject(new Error(`Claude Code가 종료 코드 ${code}로 끝났습니다. ${output.trim().slice(-300)}`));
+      else reject(new Error(`Claude Code exited with code ${code}. ${output.trim().slice(-300)}`));
     });
   });
 }

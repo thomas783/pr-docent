@@ -160,6 +160,12 @@ export function findTourInBlocks(blocks, { owner, repo, number }) {
   return found;
 }
 
+/** "ko" when the tour's text has Hangul, otherwise "en": the language to narrate it in. */
+export function tourLanguage(tour) {
+  const text = [tour.title, tour.summary, ...flattenSteps(tour).flatMap((s) => [s.note, s.point])].join(" ");
+  return /[가-힣]/.test(text) ? "ko" : "en";
+}
+
 /** The bundled tour file name for a PR, e.g. "your-org--your-repo--42.json". */
 export function tourFileName({ owner, repo, number }) {
   return `${owner}--${repo}--${number}.json`;

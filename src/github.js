@@ -8,6 +8,7 @@
 // - changing location.hash does not scroll, so we scroll ourselves
 // - comment bodies are server-rendered (.comment-body) on the Conversation page
 
+import { i18nError } from "./i18n.js";
 import { findTourInBlocks } from "./tour.js";
 
 // Highlights are CSS rules keyed on GitHub's own anchors rather than classes on elements:
@@ -54,7 +55,7 @@ export async function fetchCommentTour(pr) {
 export async function fetchPullRequestDetails(pr) {
   const { html, page } = await fetchConversation(pr);
   const headSha = html.match(/"headSha":"([0-9a-f]{40})"/)?.[1] ?? [...page.querySelectorAll('input[name="oid"]')].at(-1)?.value;
-  if (!headSha) throw new Error("PR의 최신 커밋을 찾지 못했습니다.");
+  if (!headSha) throw i18nError("headNotFound");
   return {
     title: page.querySelector("h1")?.textContent.trim().replace(/\s*-\s*#\d+$/, "") || document.title,
     body: page.querySelector(".comment-body")?.textContent.trim() ?? "",
@@ -64,7 +65,7 @@ export async function fetchPullRequestDetails(pr) {
 
 async function fetchConversation(pr) {
   const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
-  if (!response.ok) throw new Error(`PR 페이지를 읽지 못했습니다 (${response.status}).`);
+  if (!response.ok) throw i18nError("prPageFailed", response.status);
   const html = await response.text();
   return { html, page: new DOMParser().parseFromString(html, "text/html") };
 }

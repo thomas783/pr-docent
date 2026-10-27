@@ -5,6 +5,12 @@ import { pickVoice } from "../src/speech.js";
 const voice = (name, lang = "ko-KR") => ({ name, lang });
 
 describe("pickVoice", () => {
+  it("prefers Samantha for English, then the exact locale", () => {
+    const en = (name, lang = "en-US") => ({ name, lang });
+    assert.equal(pickVoice([en("Albert"), en("Daniel", "en-GB"), en("Samantha")], "en-US").name, "Samantha");
+    assert.equal(pickVoice([en("Daniel", "en-GB"), en("Albert")], "en-US").name, "Albert");
+  });
+
   it("prefers Yuna over the voices listed before it", () => {
     const voices = [voice("Eddy (Korean (South Korea))"), voice("Rocko (Korean (South Korea))"), voice("Yuna")];
     assert.equal(pickVoice(voices, "ko-KR").name, "Yuna");
