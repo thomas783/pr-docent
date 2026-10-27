@@ -164,6 +164,7 @@ GitHub의 2026년 Files changed 화면 기준입니다. 화면 구조가 바뀌�
 
 - 빌드 단계가 없습니다. 콘텐츠 스크립트(`src/loader.js`)가 ES 모듈(`src/main.js`)을 불러옵니다.
 - 테스트: `npm test` (Node 내장 테스트 러너). 투어 검증, diff 대조, 재생 상태, 단축키, PR 주소 해석, GitHub 파일 ID 해시, 줄 선택자를 다룹니다.
+- npm 게시: `package.json`의 버전을 올려 머지한 뒤 `git tag npm-v<버전> && git push origin npm-v<버전>`. GitHub Actions(`publish.yml`)가 trusted publishing으로 게시하므로 npm 토큰이나 2FA 입력이 필요 없습니다.
 - 투어 검사: `node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]` (`gh pr diff <number> > pr.diff`)
 
 ## 라이선스

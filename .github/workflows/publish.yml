@@ -1,0 +1,41 @@
+# Publishes the pr-docent npm package (the local generator) with npm trusted publishing:
+# npm trusts this workflow through GitHub's OIDC token, so no npm token is stored anywhere and
+# no one has to pass 2FA in a terminal. Push a tag matching package.json's version, for example
+#
+#   git tag npm-v0.1.2 && git push origin npm-v0.1.2
+#
+# npm's side: pr-docent → Settings → Trusted Publisher → GitHub Actions,
+# repository thomas783/pr-docent, workflow publish.yml.
+
+name: Publish to npm
+
+on:
+  push:
+    tags: ["npm-v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the OIDC token npm exchanges for a short-lived publish credential
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Check the tag matches package.json
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [ "npm-v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+            exit 1
+          fi
+
+      - run: npm test
+
+      - name: Publish
+        run: npm publish --access public
