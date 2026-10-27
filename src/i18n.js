@@ -53,6 +53,13 @@ const MESSAGES = {
     language_en: "English",
     language_ko: "한국어",
     popupHint: "Open a pull request's Files changed tab and click ▶ PR Docent.",
+    makeShort: "🎬 Make a short video",
+    shortScript: "Claude Code is writing the short… {0}s",
+    shortRender: "Rendering the video… {0}",
+    shortSaved: "Video saved: {0}",
+    shortFailed: "Couldn't make the short: {0}",
+    showInFinder: "Show in Finder",
+    playShort: "▶ Play video",
   },
   ko: {
     level_focus: "집중",
@@ -102,6 +109,13 @@ const MESSAGES = {
     language_en: "English",
     language_ko: "한국어",
     popupHint: "PR의 Files changed 탭에서 ▶ PR Docent를 누르세요.",
+    makeShort: "🎬 쇼츠 영상 만들기",
+    shortScript: "Claude Code가 쇼츠 대본을 쓰는 중… {0}초",
+    shortRender: "영상을 만드는 중… {0}",
+    shortSaved: "영상을 저장했습니다: {0}",
+    shortFailed: "쇼츠를 만들지 못했습니다: {0}",
+    showInFinder: "Finder에서 보기",
+    playShort: "▶ 영상 재생",
   },
 };
 

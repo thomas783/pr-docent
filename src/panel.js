@@ -3,7 +3,7 @@
 // narrating them, and advancing while playing.
 
 import { clearHighlight, emphasize, fetchCommentTour, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
-import { generateLocally } from "./generate.js";
+import { generateLocally, makeShort, revealFile } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
@@ -23,6 +23,8 @@ export class TourPanel {
     this.narrationToken = 0;
     this.status = "";
     this.generating = null; // progress text while the local generator runs
+    this.shorting = null; // progress text while a short is rendered
+    this.shortPath = null; // the last video made for this PR
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
@@ -91,6 +93,7 @@ export class TourPanel {
 
   async load() {
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
+    this.shortPath = (await storageGet(`prdocent:short:${this.key}`)) ?? null;
     const stored = await storageGet(`prdocent:tour:${this.key}`);
     // A tour loaded by hand wins, then one the generate-tour workflow posted, then a bundled example.
     const raw = stored ?? (await fetchCommentTour(this.pr)) ?? (await fetchBundledTour(this.pr));
@@ -139,6 +142,45 @@ export class TourPanel {
       this.status = error.notInstalled ? this.t("hostMissing") : this.t("generateFailed", this.errorText(error));
       this.render();
     }
+  }
+
+  /** Has the local host turn this tour into a short video (MP4 in Downloads). */
+  async makeShort() {
+    if (this.shorting || this.generating || !this.player) return;
+    this.shorting = this.t("readingPr");
+    this.shortPath = null;
+    this.status = "";
+    this.render();
+    try {
+      const details = await fetchPullRequestDetails(this.pr);
+      const language = tourLanguage(this.player.tour) === "ko" ? "한국어" : "English";
+      this.shortPath = await makeShort({ pr: this.pr, ...details, tour: this.player.tour, language }, (progress) => {
+        this.shorting = progress.stage === "fetch"
+          ? this.t("fetchingFiles")
+          : progress.stage === "render"
+            ? this.t("shortRender", progress.detail ?? "")
+            : this.t("shortScript", progress.seconds ?? 0);
+        this.render();
+      });
+      await storageSet(`prdocent:short:${this.key}`, this.shortPath);
+    } catch (error) {
+      this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
+    }
+    this.shorting = null;
+    this.render();
+  }
+
+  /** Plays a finished short over the page in the extension's own player page. */
+  playVideo(path) {
+    this.root.querySelector(".video-overlay")?.remove();
+    const overlay = document.createElement("div");
+    overlay.className = "video-overlay";
+    overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL(`player.html?path=${encodeURIComponent(path)}`))}"></iframe>
+      <button class="video-close" aria-label="${esc(this.t("close"))}">✕</button></div>`;
+    const close = () => overlay.remove();
+    overlay.addEventListener("click", (event) => event.target === overlay && close());
+    overlay.querySelector(".video-close").addEventListener("click", close);
+    this.root.append(overlay);
   }
 
   /** Validates [raw], saves it for this PR and starts it from the first step. */
@@ -244,6 +286,8 @@ export class TourPanel {
       ${this.header()}
       <h2>${esc(tour.title || this.t("untitledTour"))}</h2>
       ${this.generateButton(this.t("regenerate"), "compact")}
+      <button class="generate compact" data-action="short" ${this.shorting || this.generating ? "disabled" : ""}>${esc(this.shorting ?? this.t("makeShort"))}</button>
+      ${this.shortPath ? `<p class="saved"><button class="generate compact play" data-action="play">${esc(this.t("playShort"))}</button> ${esc(this.t("shortSaved", this.shortPath.split("/").pop()))} <button class="link" data-action="reveal">${esc(this.t("showInFinder"))}</button></p>` : ""}
       ${tour.summary ? `<details><summary>${esc(this.t("prSummary"))}</summary><p>${esc(tour.summary)}</p></details>` : ""}
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
       <p class="muted">${esc(this.t("stepOf", this.player.index + 1, total))}</p>
@@ -305,6 +349,9 @@ export class TourPanel {
     on("close", "click", () => this.toggleOpen());
     on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
+    on("short", "click", () => this.makeShort());
+    on("reveal", "click", () => this.shortPath && revealFile(this.shortPath).catch(() => {}));
+    on("play", "click", () => this.shortPath && this.playVideo(this.shortPath));
     if (!this.player) return;
     on("prev", "click", () => this.player.previous());
     on("next", "click", () => this.player.next());
@@ -443,6 +490,16 @@ const STYLES = `
   .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
     border: 0; background: #8250df; color: #fff; font-weight: 600; }
   .generate:disabled { opacity: .7; cursor: default; }
+  .saved { font-size: 12px; color: var(--fgColor-success, #1a7f37); }
+  .generate.compact.play { margin: 0 6px 0 0; }
+  .video-overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(1, 4, 9, .72);
+    display: flex; align-items: center; justify-content: center; }
+  .video-box { position: relative; height: min(88vh, 960px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0,0,0,.5); background: #0d1117; }
+  .video-box iframe { width: 100%; height: 100%; border: 0; }
+  .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
+  .link { border: 0; background: none; padding: 0; color: var(--fgColor-accent, #0969da); cursor: pointer; text-decoration: underline; font-size: 12px; }
   .generate.compact { display: inline-block; width: auto; margin: 0 0 4px; padding: 3px 10px; font-size: 12px; font-weight: 500;
     border: 1px solid #8250df; background: transparent; color: #8250df; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
