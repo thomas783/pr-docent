@@ -25,9 +25,9 @@ export function isTypingTarget(target) {
   return tag === "TEXTAREA" || tag === "SELECT" || (tag === "INPUT" && !["checkbox", "radio", "button"].includes(target.type));
 }
 
-/** Shortcut help shown in the panel. */
+/** Shortcut help shown in the panel: keys and the message key describing them. */
 export const SHORTCUT_HELP = [
-  ["Alt + → / ←", "다음 / 이전 단계"],
-  ["Alt + ↓ / ↑", "다음 / 이전 집중 단계"],
-  ["Alt + P", "재생 / 일시정지"],
+  ["Alt + → / ←", "shortcutStep"],
+  ["Alt + ↓ / ↑", "shortcutFocus"],
+  ["Alt + P", "shortcutPlay"],
 ];

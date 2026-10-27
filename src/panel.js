@@ -4,22 +4,22 @@
 
 import { clearHighlight, emphasize, fetchCommentTour, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { generateLocally } from "./generate.js";
+import { resolveLanguage, translate } from "./i18n.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
-import { narrationUnits, parseTour, tourFileName, uncoveredFiles } from "./tour.js";
+import { narrationUnits, parseTour, tourFileName, tourLanguage, uncoveredFiles } from "./tour.js";
 
-const LEVEL_LABEL = { focus: "집중", skim: "훑기", skip: "생략 가능" };
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
-const POINT_LABEL = "리뷰 포인트";
+const SPEECH_LOCALES = { ko: "ko-KR", en: "en-US" };
 
 export class TourPanel {
   constructor(pr) {
     this.pr = pr;
     this.key = `${pr.owner}/${pr.repo}/${pr.number}`;
     this.player = null;
-    this.settings = { voice: speechAvailable(), rate: 1 };
+    this.settings = { voice: speechAvailable(), rate: 1, language: "auto" };
     this.narrationToken = 0;
     this.status = "";
     this.generating = null; // progress text while the local generator runs
@@ -33,7 +33,23 @@ export class TourPanel {
     this.launcher.addEventListener("click", () => this.toggleOpen());
     this.onKeyDown = (event) => this.handleShortcut(event);
     document.addEventListener("keydown", this.onKeyDown, true);
+    // The toolbar popup changes the language; redraw in it right away.
+    this.onStorageChange = (changes) => {
+      if (!changes[SETTINGS_KEY]) return;
+      this.settings = { ...this.settings, ...changes[SETTINGS_KEY].newValue };
+      this.render();
+    };
+    chrome.storage?.onChanged.addListener(this.onStorageChange);
     document.body.append(this.host);
+  }
+
+  /** Interface text in the language picked in the popup (or the browser's). */
+  t(key, ...args) {
+    return translate(resolveLanguage(this.settings.language, navigator.language), key, ...args);
+  }
+
+  errorText(error) {
+    return error.i18n ? this.t(...error.i18n) : error.message;
   }
 
   handleShortcut(event) {
@@ -64,6 +80,7 @@ export class TourPanel {
 
   destroy() {
     document.removeEventListener("keydown", this.onKeyDown, true);
+    chrome.storage?.onChanged.removeListener(this.onStorageChange);
     this.stop();
     clearHighlight();
     reservePageSpace(false);
@@ -80,7 +97,7 @@ export class TourPanel {
     if (!raw) return;
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
-      this.status = `저장된 투어를 읽지 못했습니다: ${errors[0]}`;
+      this.status = this.t("savedTourInvalid", errors[0]);
       return;
     }
     this.start(tour, (await storageGet(`prdocent:pos:${this.key}`)) ?? 0);
@@ -91,7 +108,7 @@ export class TourPanel {
     try {
       raw = JSON.parse(await file.text());
     } catch {
-      this.status = "JSON 형식이 아닙니다.";
+      this.status = this.t("notJson");
       return this.render();
     }
     await this.useTour(raw);
@@ -100,15 +117,17 @@ export class TourPanel {
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
   async generate() {
     if (this.generating) return;
-    this.generating = "PR 정보를 가져오는 중…";
+    this.generating = this.t("readingPr");
     this.status = "";
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
-      const raw = await generateLocally({ pr: this.pr, ...details }, (progress) => {
+      // Write the tour in the interface language.
+      const language = resolveLanguage(this.settings.language, navigator.language) === "ko" ? "한국어" : "English";
+      const raw = await generateLocally({ pr: this.pr, ...details, language }, (progress) => {
         this.generating = progress.stage === "fetch"
-          ? "diff와 바뀐 파일을 가져오는 중…"
-          : `Claude Code가 투어를 작성하는 중… ${progress.seconds ?? 0}초`;
+          ? this.t("fetchingFiles")
+          : this.t("writingTour", progress.seconds ?? 0);
         this.render();
       });
       this.generating = null;
@@ -117,9 +136,7 @@ export class TourPanel {
       this.render();
     } catch (error) {
       this.generating = null;
-      this.status = error.notInstalled
-        ? "로컬 도우미가 설치되어 있지 않습니다. pr-docent 저장소에서 npm run install-host를 실행한 뒤 확장을 새로고침하세요."
-        : `투어를 만들지 못했습니다: ${error.message}`;
+      this.status = error.notInstalled ? this.t("hostMissing") : this.t("generateFailed", this.errorText(error));
       this.render();
     }
   }
@@ -128,13 +145,13 @@ export class TourPanel {
   async useTour(raw) {
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
-      this.status = `투어 형식 오류 ${errors.length}건: ${errors.slice(0, 3).join(" / ")}`;
+      this.status = this.t("tourFormatErrors", errors.length, errors.slice(0, 3).join(" / "));
       return this.render();
     }
     const { owner, repo, number } = tour.pr;
     this.status = owner === this.pr.owner && repo === this.pr.repo && number === this.pr.number
       ? ""
-      : `이 투어는 ${owner}/${repo}#${number}용입니다. 파일 경로가 맞지 않을 수 있습니다.`;
+      : this.t("tourForOtherPr", `${owner}/${repo}#${number}`);
     await storageSet(`prdocent:tour:${this.key}`, raw);
     this.stop();
     this.start(tour, 0);
@@ -164,9 +181,9 @@ export class TourPanel {
   async focusCurrent() {
     const result = await focusStep(this.player.current);
     this.status = result.found === "none"
-      ? "이 파일이 페이지에 없습니다. 투어가 다른 버전의 PR용일 수 있습니다."
+      ? this.t("fileNotOnPage")
       : result.found === "file" && this.player.current.lines
-        ? "해당 줄을 찾지 못해 파일 위치로 이동했습니다."
+        ? this.t("linesNotFound")
         : "";
   }
 
@@ -177,9 +194,11 @@ export class TourPanel {
   async narrate(from = { unit: 0, char: 0 }) {
     const token = ++this.narrationToken;
     const step = this.player.current;
+    // Narrate in the tour's own language, whatever language the interface is in.
+    const language = tourLanguage(this.player.tour);
     const units = narrationUnits(step, {
       chapterTitle: this.player.startsChapter ? step.chapterTitle : "",
-      pointLabel: POINT_LABEL,
+      pointLabel: translate(language, "reviewPoint"),
     });
     for (let i = from.unit; i < units.length; i++) {
       this.unitIndex = i;
@@ -188,7 +207,7 @@ export class TourPanel {
       await emphasize(step, lines);
       if (token !== this.narrationToken) return;
       if (this.settings.voice) {
-        await speak(text, { rate: this.settings.rate, from: offset });
+        await speak(text, { lang: SPEECH_LOCALES[language], rate: this.settings.rate, from: offset });
       } else {
         await sleep((Math.max(1.5, text.slice(offset).length / 12) * 1000) / this.settings.rate);
       }
@@ -210,7 +229,7 @@ export class TourPanel {
     if (!this.player) {
       this.panel.innerHTML = `
         ${this.header()}
-        <p class="muted">이 PR의 투어가 없습니다. 로컬 Claude Code로 만들거나 투어 JSON 파일을 불러오세요.</p>
+        <p class="muted">${esc(this.t("noTour"))}</p>
         ${this.generateButton()}
         ${this.fileInput()}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}`;
@@ -223,60 +242,61 @@ export class TourPanel {
 
     this.panel.innerHTML = `
       ${this.header()}
-      <h2>${esc(tour.title || "리뷰 투어")}</h2>
-      ${this.generateButton("↻ 로컬 Claude Code로 다시 생성", "compact")}
-      ${tour.summary ? `<details><summary>PR 요약</summary><p>${esc(tour.summary)}</p></details>` : ""}
+      <h2>${esc(tour.title || this.t("untitledTour"))}</h2>
+      ${this.generateButton(this.t("regenerate"), "compact")}
+      ${tour.summary ? `<details><summary>${esc(this.t("prSummary"))}</summary><p>${esc(tour.summary)}</p></details>` : ""}
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
-      <p class="muted">${this.player.index + 1} / ${total} 단계</p>
+      <p class="muted">${esc(this.t("stepOf", this.player.index + 1, total))}</p>
 
       <section class="step">
         <p class="chapter">${esc(step.chapterTitle)}</p>
         <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}</p>
-        <span class="level ${step.level}">${LEVEL_LABEL[step.level]}</span>
+        <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span>
         <p class="note">${esc(step.note)}</p>
-        ${step.point ? `<p class="point"><b>${POINT_LABEL}</b>${esc(step.point)}</p>` : ""}
+        ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
 
       <div class="controls">
-        <button data-action="prev" ${this.player.isFirst ? "disabled" : ""}>◀ 이전</button>
-        <button class="primary" data-action="toggle">${this.player.playing ? "❚❚ 일시정지" : "▶ 재생"}</button>
-        <button data-action="next" ${this.player.isLast ? "disabled" : ""}>다음 ▶</button>
+        <button data-action="prev" ${this.player.isFirst ? "disabled" : ""}>${esc(this.t("previous"))}</button>
+        <button class="primary" data-action="toggle">${esc(this.t(this.player.playing ? "pause" : "play"))}</button>
+        <button data-action="next" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("next"))}</button>
       </div>
       <div class="controls focus-nav">
-        <button data-action="previousFocus" ${this.player.findFocus(-1) < 0 ? "disabled" : ""}>⏮ 이전 집중</button>
-        <button data-action="nextFocus" ${this.player.findFocus(1) < 0 ? "disabled" : ""}>다음 집중 ⏭</button>
+        <button data-action="previousFocus" ${this.player.findFocus(-1) < 0 ? "disabled" : ""}>${esc(this.t("previousFocus"))}</button>
+        <button data-action="nextFocus" ${this.player.findFocus(1) < 0 ? "disabled" : ""}>${esc(this.t("nextFocus"))}</button>
       </div>
       <div class="settings">
-        <label><input type="checkbox" data-action="voice" ${this.settings.voice ? "checked" : ""} ${speechAvailable() ? "" : "disabled"}> 음성 안내</label>
+        <label><input type="checkbox" data-action="voice" ${this.settings.voice ? "checked" : ""} ${speechAvailable() ? "" : "disabled"}> ${esc(this.t("narration"))}</label>
         <select data-action="rate">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
       </div>
 
-      <h3>챕터</h3>
+      <h3>${esc(this.t("chapters"))}</h3>
       <ol class="chapters">
         ${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}
       </ol>
 
-      ${uncovered.length ? `<details class="uncovered"><summary>⚠ 투어가 다루지 않은 파일 ${uncovered.length}개</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
-      ${tour.skipped.length ? `<details><summary>건너뛴 파일 ${tour.skipped.length}개</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
-      <details><summary>단축키</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(what)}</dd>`).join("")}</dl></details>
-      <details><summary>다른 투어 불러오기</summary>${this.fileInput()}</details>`;
+      ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
+      ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
+      <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
+      <details><summary>${esc(this.t("loadAnother"))}</summary>${this.fileInput()}</details>`;
     this.bind();
   }
 
   header() {
     const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
     const { owner, repo, number } = this.pr;
-    return `<header><strong>PR Docent</strong><button class="close" data-action="close" aria-label="닫기">✕</button></header>
-      ${onDiff ? "" : `<p class="status">투어는 <a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a> 탭에서 동작합니다.</p>`}`;
+    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a>`;
+    return `<header><strong>PR Docent</strong><button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></header>
+      ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
-  generateButton(label = "로컬 Claude Code로 투어 생성", variant = "") {
+  generateButton(label = this.t("generate"), variant = "") {
     return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
   fileInput() {
-    return `<label class="file-input">투어 JSON 불러오기<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
+    return `<label class="file-input">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
   }
 
   bind() {
