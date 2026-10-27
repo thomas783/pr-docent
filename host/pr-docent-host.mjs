@@ -1,57 +1,73 @@
-// Local generator: Chrome starts this through native messaging when the panel asks for a tour.
-// It writes the PR's diff and changed files to a temporary folder, runs the user's own Claude
-// Code (their subscription, no API key) with the same prompt and checker as the GitHub Actions
-// workflow, and sends the checked tour back. Installed by `pr-docent install` (bin/pr-docent.mjs).
+// Local generator: Chrome starts this through native messaging when the panel asks for a tour
+// or a short. Tours: Claude Code (the user's own subscription, no API key) writes one with the
+// same prompt and checker as the GitHub Actions workflow. Shorts: see short.mjs. Installed by
+// `pr-docent install` (bin/pr-docent.mjs).
 
-import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedLineCount, checkTour, visibleLines } from "../src/diff.js";
 import { buildPrompt, checkBrevity, parseGuidelines } from "../src/guidelines.js";
 import { parseTour } from "../src/tour.js";
+import { prepareWorkspace, runClaude, stopClaude } from "./claude.mjs";
 import { createDecoder, encodeMessage } from "./native.mjs";
+import { generateShort } from "./short.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CONFIG = readConfig();
-const TIMEOUT_MS = 15 * 60 * 1000;
-
-let child = null;
 const send = (message) => process.stdout.write(encodeMessage(message));
 
 process.stdin.on(
   "data",
   createDecoder((message) => {
-    if (message.type !== "generate") return;
-    generate(message)
-      .then((tour) => send({ type: "done", tour }))
-      .catch((error) => send({ type: "error", message: error.message }))
-      .finally(() => process.exit(0));
+    const reply = (promise, toMessage) =>
+      promise
+        .then((value) => send(toMessage(value)))
+        .catch((error) => send({ type: "error", message: error.message }))
+        // Exit once stdout has flushed: on macOS pipe writes are asynchronous.
+        .finally(() => process.stdout.write("", () => process.exit(0)));
+    if (message.type === "generate") {
+      reply(generate(message), (tour) => ({ type: "done", tour }));
+    } else if (message.type === "short") {
+      const onProgress = (progress) => send({ type: "progress", ...progress });
+      reply(generateShort({ ...message, onProgress }), (path) => ({ type: "done", path }));
+    } else if (message.type === "reveal") {
+      reply(reveal(message.path), () => ({ type: "done" }));
+    } else if (message.type === "read") {
+      reply(readVideo(message.path), () => ({ type: "done" }));
+    }
   }),
 );
 // Chrome closes stdin when the extension disconnects (panel closed, tab gone): stop Claude too.
 process.stdin.on("end", () => {
-  child?.kill();
+  stopClaude();
   process.exit(0);
 });
 
+// Only files this tool writes: pr-docent-*.mp4.
+const isVideo = (path) => /\/pr-docent-[^/]+\.mp4$/.test(String(path)) && existsSync(path);
+// Chrome accepts at most 1 MB per message from a host; base64 grows data by a third.
+const CHUNK_BYTES = 600_000;
+
+/** Shows a finished video in Finder. */
+function reveal(path) {
+  if (!isVideo(path)) return Promise.reject(new Error("Not a PR Docent video"));
+  return new Promise((done) => execFile("open", ["-R", path], () => done()));
+}
+
+/** Sends a finished video to the extension's player in base64 chunks under the message limit. */
+async function readVideo(path) {
+  if (!isVideo(path)) throw new Error("Not a PR Docent video");
+  const data = readFileSync(path);
+  const total = Math.ceil(data.length / CHUNK_BYTES);
+  for (let index = 0; index < total; index++) {
+    send({ type: "chunk", index, total, data: data.subarray(index * CHUNK_BYTES, (index + 1) * CHUNK_BYTES).toString("base64") });
+  }
+}
+
 async function generate({ pr, title, body, headSha, diff, files, guidelines = "", model, language }) {
-  // Real path: on macOS the temp folder is a symlink, and the write rule must match exactly.
-  const work = realpathSync(mkdtempSync(join(tmpdir(), "pr-docent-")));
+  const { work, repo, out } = prepareWorkspace({ files, diff, title, body, headSha });
   try {
-    const repo = join(work, "repo");
-    const out = join(work, "out");
-    mkdirSync(repo);
-    mkdirSync(out);
-    for (const [path, content] of Object.entries(files)) {
-      const target = resolve(repo, path);
-      if (!target.startsWith(repo + sep)) continue; // never write outside the folder
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, content);
-    }
-    writeFileSync(join(out, "pr.diff"), diff);
-    writeFileSync(join(out, "pr.json"), JSON.stringify({ title, body, headRefOid: headSha }, null, 2));
     if (guidelines) writeFileSync(join(out, "guidelines.md"), guidelines);
     const { limits, errors: guidelineErrors } = parseGuidelines(guidelines);
     if (guidelineErrors.length) throw new Error(`.github/pr-docent.md: ${guidelineErrors.join(" / ")}`);
@@ -70,7 +86,7 @@ async function generate({ pr, title, body, headSha, diff, files, guidelines = ""
       "--model", model || "claude-opus-5-5",
       "--permission-mode", "dontAsk",
       "--allowedTools", `Read,Glob,Grep,Edit(/${out}/tour.json),Bash(node ${ROOT}/scripts/check-tour.mjs:*)`,
-    ]);
+    ], (seconds) => send({ type: "progress", seconds }));
 
     let raw;
     try {
@@ -87,33 +103,4 @@ async function generate({ pr, title, body, headSha, diff, files, guidelines = ""
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
-}
-
-/** Written by the installer; without it, use whatever claude is on PATH. */
-function readConfig() {
-  try {
-    return JSON.parse(readFileSync(join(homedir(), ".pr-docent", "config.json"), "utf8"));
-  } catch {
-    return { claude: "claude" };
-  }
-}
-
-function runClaude(prompt, cwd, args) {
-  return new Promise((resolvePromise, reject) => {
-    const started = Date.now();
-    let output = "";
-    child = spawn(CONFIG.claude, ["-p", prompt, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
-    const keep = (chunk) => (output = (output + chunk).slice(-2000));
-    child.stdout.on("data", keep);
-    child.stderr.on("data", keep);
-    const progress = setInterval(() => send({ type: "progress", seconds: Math.round((Date.now() - started) / 1000) }), 5000);
-    const timeout = setTimeout(() => child.kill(), TIMEOUT_MS);
-    child.on("error", (error) => reject(new Error(`Could not start Claude Code (${CONFIG.claude}): ${error.message}`)));
-    child.on("close", (code) => {
-      clearInterval(progress);
-      clearTimeout(timeout);
-      if (code === 0) resolvePromise();
-      else reject(new Error(`Claude Code exited with code ${code}. ${output.trim().slice(-300)}`));
-    });
-  });
 }
