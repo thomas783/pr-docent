@@ -53,15 +53,22 @@ function loadVoices(timeoutMs = 3000) {
   });
 }
 
+// Natural macOS voices; the first voices listed for a language are often novelty ones
+// (Eddy, Rocko, Albert, ...).
+const PREFERRED_VOICES = { ko: "Yuna", en: "Samantha" };
+
 /**
- * Prefers macOS's Yuna (its Premium/Enhanced download first) over the novelty
- * voices (Eddy, Rocko, ...) that come first in the list.
+ * Prefers the language's natural macOS voice (its Premium/Enhanced download first), then any
+ * voice for the exact locale, then any voice for the language.
  */
 export function pickVoice(voices, lang) {
-  const matching = voices.filter((v) => v.lang?.startsWith(lang.slice(0, 2)));
+  const base = lang.slice(0, 2);
+  const matching = voices.filter((v) => v.lang?.startsWith(base));
+  const preferred = PREFERRED_VOICES[base];
   return (
-    matching.find((v) => /^Yuna \((Premium|Enhanced)\)/.test(v.name)) ??
-    matching.find((v) => v.name.startsWith("Yuna")) ??
+    (preferred && matching.find((v) => new RegExp(`^${preferred} \\((Premium|Enhanced)\\)`).test(v.name))) ??
+    (preferred && matching.find((v) => v.name.startsWith(preferred))) ??
+    matching.find((v) => v.lang === lang) ??
     matching[0]
   );
 }

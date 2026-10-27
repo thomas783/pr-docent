@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { findTourInBlocks, flattenSteps, narrationUnits, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
+import { findTourInBlocks, flattenSteps, narrationUnits, tourLanguage, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
 
 const valid = {
   version: 1,
@@ -112,6 +112,14 @@ describe("findTourInBlocks", () => {
 
   it("returns null when no block is a tour of this PR", () => {
     assert.equal(findTourInBlocks([tour(8, "x"), "[]"], pr), null);
+  });
+});
+
+describe("tourLanguage", () => {
+  const tourWith = (note) => parseTour({ version: 1, pr: { owner: "o", repo: "r", number: 1 }, title: "Fix", chapters: [{ title: "A", steps: [{ file: "a", note }] }] }).tour;
+  it("is Korean when the text has Hangul, English otherwise", () => {
+    assert.equal(tourLanguage(tourWith("원장 안분을 고칩니다.")), "ko");
+    assert.equal(tourLanguage(tourWith("Splits the ledger.")), "en");
   });
 });
 
