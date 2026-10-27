@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parsePullRequestPath, rowSelectors, sha256Hex } from "../src/github.js";
+import { frameCss, parsePullRequestPath, rowSelectors, sha256Hex } from "../src/github.js";
 
 describe("parsePullRequestPath", () => {
   it("recognizes PR pages and the diff tab", () => {
@@ -17,6 +17,28 @@ describe("sha256Hex", () => {
   it("matches the file ids GitHub uses on the diff page", async () => {
     // Observed on github.com: the diff container of .github/workflows/ci.yml has this id.
     assert.equal(await sha256Hex(".github/workflows/ci.yml"), "b803fcb7f17ed9235f1e5cb1fcd2f5d3b2838429d4368ae4c57ce4436577f03f");
+  });
+});
+
+describe("frameCss", () => {
+  const frame = { width: 2, color: "red" };
+
+  it("frames rows as one box: top on the first, bottom on the last, sides on every row", () => {
+    const css = frameCss(["A", "B", "C"], frame).split("\n");
+    assert.deepEqual(css, [
+      "A > td { box-shadow: inset 0 2px 0 red; }",
+      "A > td:first-child { box-shadow: inset 0 2px 0 red, inset 2px 0 0 red; }",
+      "A > td:last-child { box-shadow: inset 0 2px 0 red, inset -2px 0 0 red; }",
+      "B > td:first-child { box-shadow: inset 2px 0 0 red; }",
+      "B > td:last-child { box-shadow: inset -2px 0 0 red; }",
+      "C > td { box-shadow: inset 0 -2px 0 red; }",
+      "C > td:first-child { box-shadow: inset 0 -2px 0 red, inset 2px 0 0 red; }",
+      "C > td:last-child { box-shadow: inset 0 -2px 0 red, inset -2px 0 0 red; }",
+    ]);
+  });
+
+  it("closes a single row on all four sides and takes a specificity prefix", () => {
+    assert.match(frameCss(["A"], frame, "html "), /^html A > td:first-child \{ box-shadow: inset 0 2px 0 red, inset 0 -2px 0 red, inset 2px 0 0 red; \}$/m);
   });
 });
 

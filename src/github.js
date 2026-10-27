@@ -15,14 +15,15 @@ import { findTourInBlocks } from "./tour.js";
 // React re-renders (e.g. after "Load Diff") replace the nodes and would drop our classes.
 const HIGHLIGHT_STYLE_ID = "prdocent-highlight";
 const EMPHASIS_STYLE_ID = "prdocent-emphasis";
-const ROW_STYLE = "background-color: rgba(130, 80, 223, 0.16) !important;";
 const FILE_STYLE = "outline: 3px solid #8250df; outline-offset: 2px; border-radius: 6px;";
 const READING_LINE = 0.25;
 // Spotlight: every other diff cell fades so only the step's lines stand out. The step's rows
-// win because their selector is more specific (the :has() argument counts).
-const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.2; transition: opacity 0.3s, background-color 0.3s; }`;
-// Emphasis: the lines the narration is talking about right now, inside the step's range.
-const EMPHASIS_ROW_STYLE = "background-color: rgba(130, 80, 223, 0.36) !important; opacity: 1;";
+// win because their selector is more specific (the :has() argument counts). The step is framed
+// rather than tinted, so GitHub's own green and red for added and removed lines stay visible.
+const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.2; transition: opacity 0.3s; }`;
+const STEP_FRAME = { width: 2, color: "rgba(130, 80, 223, 0.7)" };
+// Emphasis: the lines the narration is talking about right now get a heavier frame.
+const EMPHASIS_FRAME = { width: 4, color: "#a371f7" };
 const STICKY_HEADER_HEIGHT = 80;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
@@ -101,6 +102,35 @@ async function waitFor(condition, timeoutMs) {
 }
 
 /** CSS selectors for the diff rows of [start, end] on one side of a file. */
+/**
+ * Selectors for every diff row from the first to the last of [present], including rows a line
+ * range can't name, such as deleted lines between kept ones, so the step shows them in red rather
+ * than fading them out. Keyed on each row's own line anchor, which survives React re-renders.
+ */
+function rowsBetween(present) {
+  const selectors = [];
+  for (let row = present[0]?.closest("tr"); row; row = row.nextElementSibling) {
+    const anchor = row.querySelector(":scope > td[data-line-anchor]")?.dataset.lineAnchor;
+    if (anchor) selectors.push(`tr:has(> td[data-line-anchor="${anchor}"])`);
+    if (row === present.at(-1).closest("tr")) break;
+  }
+  return selectors;
+}
+
+/**
+ * CSS that draws one frame around consecutive table rows: a diff is a table, so each cell gets
+ * inset shadows for the edges it sits on (top of the first row, bottom of the last, the left of
+ * first cells and the right of last cells). [prefix] raises specificity over earlier frames.
+ */
+export function frameCss(rows, { width, color }, prefix = "") {
+  const edge = { top: `inset 0 ${width}px 0 ${color}`, bottom: `inset 0 -${width}px 0 ${color}`, left: `inset ${width}px 0 0 ${color}`, right: `inset -${width}px 0 0 ${color}` };
+  return rows.map((sel, i) => {
+    const vertical = [i === 0 && edge.top, i === rows.length - 1 && edge.bottom].filter(Boolean);
+    const rule = (cell, sides) => (sides.length ? `${prefix}${sel} > td${cell} { box-shadow: ${sides.join(", ")}; }` : "");
+    return [rule("", vertical), rule(":first-child", [...vertical, edge.left]), rule(":last-child", [...vertical, edge.right])].filter(Boolean).join("\n");
+  }).join("\n");
+}
+
 export function rowSelectors(hash, side, [start, end]) {
   const letter = side === "left" ? "L" : "R";
   const selectors = [];
@@ -128,9 +158,10 @@ export async function focusStep(step) {
     const rows = rowSelectors(hash, step.side, step.lines);
     const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
     if (present.length) {
+      const shown = rowsBetween(present);
       setHighlight(`${DIM_STYLE}
-        ${rows.map((sel) => `${sel} > td`).join(",\n")} { ${ROW_STYLE} opacity: 1; }
-        ${rows.map((sel) => `${sel} > td:first-child`).join(",\n")} { box-shadow: inset 3px 0 0 #8250df; }`);
+        ${shown.map((sel) => `${sel} > td`).join(",\n")} { opacity: 1; }
+        ${frameCss(shown, STEP_FRAME)}`);
       await scrollToReadingLine(firstShown(rows));
       return { found: "lines", count: present.length };
     }
@@ -151,10 +182,13 @@ export async function emphasize(step, lines) {
   const rows = rowSelectors(hash, step.side, lines);
   const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
   if (!present.length) return setStyle(EMPHASIS_STYLE_ID, "");
-  const stepRows = rowSelectors(hash, step.side, step.lines);
+  const stepPresent = rowSelectors(hash, step.side, step.lines).map((sel) => document.querySelector(sel)).filter(Boolean);
+  const stepRows = rowsBetween(stepPresent);
+  const shown = rowsBetween(present);
   // "html" makes these rules more specific than the step highlight, whatever the style order.
   setStyle(EMPHASIS_STYLE_ID, `${stepRows.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 0.45; }
-    ${rows.map((sel) => `html ${sel} > td`).join(",\n")} { ${EMPHASIS_ROW_STYLE} }`);
+    ${shown.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 1; }
+    ${frameCss(shown, EMPHASIS_FRAME, "html ")}`);
   const top = present[0].getBoundingClientRect().top;
   const bottom = present.at(-1).getBoundingClientRect().bottom;
   if (top < STICKY_HEADER_HEIGHT || bottom > window.innerHeight) await scrollToReadingLine(firstShown(rows));
