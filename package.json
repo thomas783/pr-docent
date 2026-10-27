@@ -27,8 +27,11 @@
     "host/",
     "src/diff.js",
     "src/guidelines.js",
+    "src/short.js",
     "src/tour.js",
+    "scripts/check-short.mjs",
     "scripts/check-tour.mjs",
+    "scripts/short-prompt.md",
     "scripts/tour-prompt.md"
   ],
   "scripts": {

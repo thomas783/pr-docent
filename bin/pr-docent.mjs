@@ -3,6 +3,7 @@
 //
 //   npx pr-docent install [--extension-id <id>]...   register with Chrome (once per computer)
 //   npx pr-docent uninstall                           remove the registration and files
+//   npx pr-docent short <owner/repo#n | PR URL>       make a short video of a PR (macOS, needs gh)
 //
 // Install copies the generator into ~/.pr-docent/app, so it keeps working after npx clears its
 // cache, and writes a wrapper that pins PATH, Node and Claude Code: Chrome starts native hosts
@@ -17,7 +18,11 @@ import { EXTENSION_IDS, HOST_NAME } from "../host/native.mjs";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // What the host needs at run time; everything else in the package is for the extension or tests.
-const RUNTIME_FILES = ["host/native.mjs", "host/pr-docent-host.mjs", "src/diff.js", "src/guidelines.js", "src/tour.js", "scripts/check-tour.mjs", "scripts/tour-prompt.md"];
+const RUNTIME_FILES = [
+  "host/claude.mjs", "host/native.mjs", "host/pr-docent-host.mjs", "host/render-short.mjs", "host/short.mjs",
+  "src/diff.js", "src/guidelines.js", "src/short.js", "src/tour.js",
+  "scripts/check-short.mjs", "scripts/check-tour.mjs", "scripts/short-prompt.md", "scripts/tour-prompt.md",
+];
 const HOSTS_DIRS = {
   darwin: join(homedir(), "Library", "Application Support", "Google", "Chrome", "NativeMessagingHosts"),
   linux: join(homedir(), ".config", "google-chrome", "NativeMessagingHosts"),
@@ -30,8 +35,11 @@ const hostManifest = hostsDir && join(hostsDir, `${HOST_NAME}.json`);
 
 if (command === "install") install(args);
 else if (command === "uninstall") uninstall();
-else {
-  console.log("usage: pr-docent install [--extension-id <id>]... | pr-docent uninstall");
+else if (command === "short") {
+  const { shortCommand } = await import("../host/short-cli.mjs");
+  await shortCommand(args).catch((error) => fail(error.message));
+} else {
+  console.log("usage: pr-docent install [--extension-id <id>]... | pr-docent uninstall | pr-docent short <owner/repo#number>");
   process.exit(command === "help" ? 0 : 2);
 }
 
