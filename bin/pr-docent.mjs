@@ -75,7 +75,8 @@ function install(args) {
   Generator:            ${app}
   Allowed extensions:   ${extensionIds.join(", ")}
   Claude Code:          ${claude}
-Reload the extension in chrome://extensions, then use "로컬 Claude Code로 투어 생성" in the panel.`);
+Reload the extension in chrome://extensions, then click "Create a tour with local Claude Code"
+in the panel ("로컬 Claude Code로 투어 생성" in Korean).`);
 }
 
 function uninstall() {

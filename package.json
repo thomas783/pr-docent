@@ -1,6 +1,6 @@
 {
   "name": "pr-docent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Guided, narrated review tours on top of GitHub pull request diffs. This package installs the local tour generator for the PR Docent Chrome extension.",
   "license": "MIT",
