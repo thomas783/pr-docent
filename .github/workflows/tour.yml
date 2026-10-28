@@ -17,6 +17,8 @@ jobs:
     with:
       # This repo tests its own changes to the prompt and checker.
       tools-ref: ${{ github.event.pull_request.head.sha }}
+      # The English demo pull request (branch demo/en-*) gets an English tour.
+      language: ${{ startsWith(github.head_ref, 'demo/en-') && 'English' || '한국어' }}
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     permissions:

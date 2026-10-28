@@ -9,47 +9,82 @@
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { parseShort } from "../src/short.js";
-import { flattenSteps, parseTour } from "../src/tour.js";
+import { flattenSteps, parseTour, tourLanguage } from "../src/tour.js";
 
 export const MARKER = "<!-- pr-docent:tour -->";
 const MAX_COMMENT_LENGTH = 65000; // GitHub rejects comment bodies over 65536 characters
+
+// Text from the tour goes into Markdown lists and <details> sections: keep it on one line and
+// stop it from opening or closing HTML tags (a "</details>" would unfold the JSON below).
+const inline = (text) => String(text ?? "").replace(/\s*\n\s*/g, " ").replace(/</g, "&lt;");
+
+// The comment's own words, in the tour's language.
+const TEXT = {
+  en: {
+    heading: (title) => `## 🎧 PR Docent review tour: ${title}`,
+    madeFor: (sha) => `Made for commit \`${sha}\`.`,
+    howTo: (chapters, steps) => `Click **PR Docent** on the Files changed tab to play this tour (${chapters} chapters, ${steps} steps).`,
+    chapters: "### Chapters",
+    stepCount: (n) => `(${n} ${n === 1 ? "step" : "steps"})`,
+    points: "### Review points",
+    skipped: "Skipped files",
+    short: (title) => `### 🎬 Short: ${title}`,
+    shortHowTo: "Play it with the video button in the PR Docent panel on the Files changed tab.",
+    tourJson: "Tour JSON (read by the PR Docent extension)",
+    shortJson: "Short script JSON (read by the PR Docent extension)",
+  },
+  ko: {
+    heading: (title) => `## 🎧 PR Docent 리뷰 투어: ${title}`,
+    madeFor: (sha) => `커밋 \`${sha}\` 기준으로 만든 투어입니다.`,
+    howTo: (chapters, steps) => `Files changed 탭에서 **PR Docent**를 누르면 이 투어가 재생됩니다. (${chapters}개 챕터, ${steps}단계)`,
+    chapters: "### 챕터",
+    stepCount: (n) => `(${n}단계)`,
+    points: "### 리뷰 포인트",
+    skipped: "건너뛴 파일",
+    short: (title) => `### 🎬 쇼츠: ${title}`,
+    shortHowTo: "Files changed 탭의 PR Docent 패널에서 영상 버튼을 누르면 재생됩니다.",
+    tourJson: "투어 JSON (PR Docent 확장이 읽습니다)",
+    shortJson: "쇼츠 대본 JSON (PR Docent 확장이 읽습니다)",
+  },
+};
 
 /** The comment for a tour and, when there is one, the short made from it. */
 export function renderComment(raw, shortRaw = null) {
   const { tour, errors } = parseTour(raw);
   if (errors.length) throw new Error(`Invalid tour: ${errors.join("; ")}`);
   const steps = flattenSteps(tour);
+  const t = TEXT[tourLanguage(tour)];
   const lines = [
     MARKER,
-    `## 🎧 PR Docent 리뷰 투어: ${tour.title}`,
+    t.heading(inline(tour.title)),
     "",
-    tour.summary,
+    inline(tour.summary),
     "",
-    ...(tour.pr.head ? [`커밋 \`${tour.pr.head.slice(0, 7)}\` 기준으로 만든 투어입니다.`, ""] : []),
-    `Files changed 탭에서 **▶ PR Docent**를 누르면 이 투어가 재생됩니다. (${tour.chapters.length}개 챕터, ${steps.length}단계)`,
+    ...(tour.pr.head ? [t.madeFor(tour.pr.head.slice(0, 7)), ""] : []),
+    t.howTo(tour.chapters.length, steps.length),
     "",
-    "### 챕터",
-    ...tour.chapters.map((c) => `- **${c.title}** ${c.summary} (${c.steps.length}단계)`),
+    t.chapters,
+    ...tour.chapters.map((c) => `- ${[`**${inline(c.title)}**`, inline(c.summary), t.stepCount(c.steps.length)].filter(Boolean).join(" ")}`),
   ];
   const points = steps.filter((s) => s.point);
   if (points.length) {
-    lines.push("", "### 리뷰 포인트");
-    for (const s of points) lines.push(`- \`${s.file}${s.lines ? `:${s.lines[0]}-${s.lines[1]}` : ""}\` ${s.point}`);
+    lines.push("", t.points);
+    for (const s of points) lines.push(`- \`${s.file}${s.lines ? `:${s.lines[0]}-${s.lines[1]}` : ""}\` ${inline(s.point)}`);
   }
   if (tour.skipped.length) {
-    lines.push("", "<details><summary>건너뛴 파일</summary>", "");
-    for (const s of tour.skipped) lines.push(`- \`${s.file}\` ${s.reason}`);
+    lines.push("", `<details><summary>${t.skipped}</summary>`, "");
+    for (const s of tour.skipped) lines.push(`- \`${s.file}\` ${inline(s.reason)}`);
     lines.push("", "</details>");
   }
   const short = shortRaw && parseShort(shortRaw).short;
   if (short) {
-    lines.push("", `### 🎬 쇼츠: ${short.title}`, "", short.hook, "", "Files changed 탭의 PR Docent 패널에서 **🎬 쇼츠 보기**로 재생됩니다.");
-    for (const scene of short.scenes) lines.push(`- **${scene.headline}** ${scene.narration}`);
+    lines.push("", t.short(inline(short.title)), "", inline(short.hook), "", t.shortHowTo);
+    for (const scene of short.scenes) lines.push(`- **${inline(scene.headline)}** ${inline(scene.narration)}`);
   }
   // A ``` inside a note would end the code block early; \u0060 is the same backtick to JSON.
   const block = (value) => ["```json", JSON.stringify(value).replace(/`/g, "\\u0060"), "```"];
-  lines.push("", "<details><summary>투어 JSON (PR Docent 확장이 읽습니다)</summary>", "", ...block(raw), "", "</details>", "");
-  if (short) lines.push("<details><summary>쇼츠 대본 JSON (PR Docent 확장이 읽습니다)</summary>", "", ...block(shortRaw), "", "</details>", "");
+  lines.push("", `<details><summary>${t.tourJson}</summary>`, "", ...block(raw), "", "</details>", "");
+  if (short) lines.push(`<details><summary>${t.shortJson}</summary>`, "", ...block(shortRaw), "", "</details>", "");
   const body = lines.join("\n");
   if (body.length > MAX_COMMENT_LENGTH) throw new Error(`Comment is ${body.length} characters; GitHub allows ${MAX_COMMENT_LENGTH}`);
   return body;
