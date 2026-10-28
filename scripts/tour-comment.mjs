@@ -14,6 +14,10 @@ import { flattenSteps, parseTour, tourLanguage } from "../src/tour.js";
 export const MARKER = "<!-- pr-docent:tour -->";
 const MAX_COMMENT_LENGTH = 65000; // GitHub rejects comment bodies over 65536 characters
 
+// Text from the tour goes into Markdown lists and <details> sections: keep it on one line and
+// stop it from opening or closing HTML tags (a "</details>" would unfold the JSON below).
+const inline = (text) => String(text ?? "").replace(/\s*\n\s*/g, " ").replace(/</g, "&lt;");
+
 // The comment's own words, in the tour's language.
 const TEXT = {
   en: {
@@ -52,30 +56,30 @@ export function renderComment(raw, shortRaw = null) {
   const t = TEXT[tourLanguage(tour)];
   const lines = [
     MARKER,
-    t.heading(tour.title),
+    t.heading(inline(tour.title)),
     "",
-    tour.summary,
+    inline(tour.summary),
     "",
     ...(tour.pr.head ? [t.madeFor(tour.pr.head.slice(0, 7)), ""] : []),
     t.howTo(tour.chapters.length, steps.length),
     "",
     t.chapters,
-    ...tour.chapters.map((c) => `- ${[`**${c.title}**`, c.summary, t.stepCount(c.steps.length)].filter(Boolean).join(" ")}`),
+    ...tour.chapters.map((c) => `- ${[`**${inline(c.title)}**`, inline(c.summary), t.stepCount(c.steps.length)].filter(Boolean).join(" ")}`),
   ];
   const points = steps.filter((s) => s.point);
   if (points.length) {
     lines.push("", t.points);
-    for (const s of points) lines.push(`- \`${s.file}${s.lines ? `:${s.lines[0]}-${s.lines[1]}` : ""}\` ${s.point}`);
+    for (const s of points) lines.push(`- \`${s.file}${s.lines ? `:${s.lines[0]}-${s.lines[1]}` : ""}\` ${inline(s.point)}`);
   }
   if (tour.skipped.length) {
     lines.push("", `<details><summary>${t.skipped}</summary>`, "");
-    for (const s of tour.skipped) lines.push(`- \`${s.file}\` ${s.reason}`);
+    for (const s of tour.skipped) lines.push(`- \`${s.file}\` ${inline(s.reason)}`);
     lines.push("", "</details>");
   }
   const short = shortRaw && parseShort(shortRaw).short;
   if (short) {
-    lines.push("", t.short(short.title), "", short.hook, "", t.shortHowTo);
-    for (const scene of short.scenes) lines.push(`- **${scene.headline}** ${scene.narration}`);
+    lines.push("", t.short(inline(short.title)), "", inline(short.hook), "", t.shortHowTo);
+    for (const scene of short.scenes) lines.push(`- **${inline(scene.headline)}** ${inline(scene.narration)}`);
   }
   // A ``` inside a note would end the code block early; \u0060 is the same backtick to JSON.
   const block = (value) => ["```json", JSON.stringify(value).replace(/`/g, "\\u0060"), "```"];

@@ -22,6 +22,14 @@ describe("renderComment", () => {
     assert.match(ko, /## 🎧 PR Docent 리뷰 투어: 로그인 잠금/);
     assert.match(ko, /### 챕터/);
   });
+  it("keeps tour text from breaking the comment's sections", () => {
+    const raw = { ...tour("T", "n"), skipped: [{ file: "a.txt", reason: "generated</details>\n\n## Hijacked" }] };
+    const body = renderComment(raw);
+    assert.match(body, /- `a.txt` generated&lt;\/details> ## Hijacked/);
+    // Code blocks show text as is; outside them, every section opened is closed once.
+    const outside = body.replace(/```json\n.*?\n```/gs, "");
+    assert.equal(outside.match(/<details>/g).length, outside.match(/<\/details>/g).length);
+  });
   it("carries the tour for the extension to find", () => {
     const body = renderComment(tour("T", "n"));
     const blocks = [...body.matchAll(/```json\n(.*?)\n```/gs)].map((m) => m[1]);
