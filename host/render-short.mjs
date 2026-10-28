@@ -9,7 +9,9 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { FRAME_HEIGHT as HEIGHT, FRAME_WIDTH as WIDTH, SHORT_CSS, sceneList, sceneMarkup, sceneSteps } from "../src/short-scenes.js";
 
-const run = promisify(execFile);
+// Aborted when the extension disconnects, which kills the say, Chrome or ffmpeg run in progress.
+const stopping = new AbortController();
+const run = (command, args) => promisify(execFile)(command, args, { signal: stopping.signal });
 const LEAD_IN = 0.3; // seconds of silence before each sentence
 const TAIL = 0.8; // and after it
 const CHROME_PATHS = [
@@ -17,6 +19,11 @@ const CHROME_PATHS = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
 ];
 const PREFERRED_VOICES = { ko: ["Yuna (Premium)", "Yuna (Enhanced)", "Yuna"], en: ["Samantha (Premium)", "Samantha (Enhanced)", "Samantha"] };
+
+/** Stops a render in progress: its current subprocess is killed and the render fails. */
+export function stopRendering() {
+  stopping.abort();
+}
 
 /** Writes the MP4 for [short] to [outPath], working in [workDir]. Calls onProgress(text) per scene. */
 export async function renderShort({ short, outPath, workDir, onProgress = () => {} }) {
