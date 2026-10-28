@@ -158,3 +158,10 @@ describe("tour revision", () => {
     assert.equal(pickTour(stale, null, null), stale);
   });
 });
+
+describe("tourLanguage", () => {
+  it("counts chapter titles, which are read aloud too", () => {
+    const tour = parseTour({ ...valid, chapters: [{ title: "1. 속도 제한", steps: [{ file: "a.kt", note: "Counts requests." }] }] }).tour;
+    assert.equal(tourLanguage(tour), "ko");
+  });
+});
