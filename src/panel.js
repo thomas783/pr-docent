@@ -675,7 +675,7 @@ const STYLES = `
   .video-box { position: relative; height: min(88vh, 960px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
     box-shadow: 0 24px 64px rgba(0,0,0,.5); background: #0d1117; }
   .video-box iframe { width: 100%; height: 100%; border: 0; }
-  .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
+  .video-close { display: flex; align-items: center; justify-content: center; position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
