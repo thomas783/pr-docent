@@ -124,12 +124,23 @@ function buttonName(button) {
   return (by ? document.getElementById(by)?.textContent : button.getAttribute("aria-label"))?.trim() ?? "";
 }
 
-/** Whether the reviewer marked the file as Viewed, which also collapses it. */
-function isViewed(fileId) {
-  return [...(document.getElementById(fileId)?.querySelectorAll('button[aria-pressed="true"]') ?? [])].some((b) => b.textContent.trim() === "Viewed");
+/** The file's Viewed toggle while it is on; GitHub collapses files marked as Viewed. */
+function viewedButton(fileId) {
+  return [...(document.getElementById(fileId)?.querySelectorAll('button[aria-pressed="true"]') ?? [])].find((b) => b.textContent.trim() === "Viewed");
 }
 
-/** Opens a collapsed file (such as a Viewed one) without changing its Viewed mark. */
+/**
+ * Takes the Viewed mark off a file so it can be reviewed again, as the reviewer asked. GitHub
+ * opens the file when the mark comes off; if it stays collapsed, open it.
+ */
+async function unmarkViewed(fileId) {
+  viewedButton(fileId)?.click();
+  const hasRows = () => Boolean(document.getElementById(fileId)?.querySelector("tr.diff-line-row"));
+  await waitFor(() => !viewedButton(fileId) && hasRows(), 2000);
+  if (!hasRows()) await expandFile(fileId);
+}
+
+/** Opens a collapsed file. */
 async function expandFile(fileId) {
   const toggle = [...(document.getElementById(fileId)?.querySelectorAll("button") ?? [])].find((b) => buttonName(b) === "Expand file");
   if (!toggle) return;
@@ -192,14 +203,15 @@ export async function focusStep(step, { openViewed = false } = {}) {
     setHighlight("");
     return { found: "none" };
   }
-  // A file the reviewer marked as Viewed: show where it is, and open it only when asked to.
-  if (isViewed(fileId)) {
+  // A file the reviewer marked as Viewed: show where it is, and open it (taking the mark off)
+  // only when asked to.
+  if (viewedButton(fileId)) {
     if (!openViewed) {
       setHighlight(`#${fileId} { ${FILE_STYLE} }`);
       await scrollToReadingLine(() => document.getElementById(fileId));
       return { found: "viewed" };
     }
-    await expandFile(fileId);
+    await unmarkViewed(fileId);
   }
 
   if (step.lines) {
