@@ -28,6 +28,7 @@
     "src/diff.js",
     "src/guidelines.js",
     "src/short.js",
+    "src/short-scenes.js",
     "src/tour.js",
     "scripts/check-short.mjs",
     "scripts/check-tour.mjs",

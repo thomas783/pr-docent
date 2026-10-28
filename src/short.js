@@ -140,3 +140,19 @@ export function revealSteps(scene) {
   if (scene.kind === "points") return scene.points.length;
   return 1;
 }
+
+/** The short for [pr] among the code blocks of the PR's comments, or null (like findTourInBlocks). */
+export function findShortInBlocks(blocks, { owner, repo, number }) {
+  let found = null;
+  for (const text of blocks) {
+    let raw;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    const forThisPr = raw?.version === 1 && raw.pr?.owner === owner && raw.pr?.repo === repo && raw.pr?.number === number;
+    if (forThisPr && Array.isArray(raw.scenes) && typeof raw.hook === "string") found = raw;
+  }
+  return found;
+}

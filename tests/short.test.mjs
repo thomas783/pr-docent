@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checkShort, parseShort, revealSteps } from "../src/short.js";
+import { checkShort, findShortInBlocks, parseShort, revealSteps } from "../src/short.js";
+import { findTourInBlocks } from "../src/tour.js";
 
 const flow = { kind: "flow", headline: "자동 생성", narration: "PR을 올리면 투어가 만들어집니다.", steps: [{ icon: "📝", label: "PR" }, { label: "Claude", status: "new" }], links: ["실행"] };
 const compare = { kind: "compare", headline: "전과 후", narration: "이제 자동입니다.", before: { label: "이전", items: ["손으로 작성"] }, after: { label: "이후", items: ["자동 생성", "검사 통과"] } };
@@ -57,5 +58,18 @@ describe("revealSteps", () => {
   it("reveals one element at a time", () => {
     const { short: s } = short([flow, compare, structure, points]);
     assert.deepEqual(s.scenes.map(revealSteps), [2, 2, 2, 2]);
+  });
+});
+
+describe("finding the tour and the short in one comment", () => {
+  const pr = { owner: "o", repo: "r", number: 1 };
+  const tour = JSON.stringify({ version: 1, pr, title: "t", chapters: [] });
+  const shortJson = JSON.stringify({ version: 1, pr, title: "t", hook: "h", scenes: [], outro: "o" });
+
+  it("tells them apart", () => {
+    assert.equal(findTourInBlocks([tour, shortJson], pr).chapters.length, 0);
+    assert.equal(findShortInBlocks([tour, shortJson], pr).hook, "h");
+    assert.equal(findTourInBlocks([shortJson], pr), null);
+    assert.equal(findShortInBlocks([tour], pr), null);
   });
 });

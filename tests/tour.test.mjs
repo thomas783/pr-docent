@@ -103,7 +103,7 @@ describe("narrationUnits", () => {
 
 describe("findTourInBlocks", () => {
   const pr = { owner: "o", repo: "r", number: 7 };
-  const tour = (number, title) => JSON.stringify({ version: 1, pr: { owner: "o", repo: "r", number }, title });
+  const tour = (number, title) => JSON.stringify({ version: 1, pr: { owner: "o", repo: "r", number }, title, chapters: [] });
 
   it("picks the last tour of this PR and ignores other code blocks", () => {
     const blocks = ["npm test", "{ not json", tour(7, "old"), tour(8, "other PR"), '{"version":2}', tour(7, "new")];

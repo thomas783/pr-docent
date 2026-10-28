@@ -20,7 +20,7 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // What the host needs at run time; everything else in the package is for the extension or tests.
 const RUNTIME_FILES = [
   "host/claude.mjs", "host/native.mjs", "host/pr-docent-host.mjs", "host/render-short.mjs", "host/short.mjs",
-  "src/diff.js", "src/guidelines.js", "src/short.js", "src/tour.js",
+  "src/diff.js", "src/guidelines.js", "src/short.js", "src/short-scenes.js", "src/tour.js",
   "scripts/check-short.mjs", "scripts/check-tour.mjs", "scripts/short-prompt.md", "scripts/tour-prompt.md",
 ];
 const HOSTS_DIRS = {

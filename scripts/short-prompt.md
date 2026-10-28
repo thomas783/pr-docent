@@ -1,7 +1,8 @@
-You are writing a PR Docent short for pull request {{PR}}: a 30-45 second vertical video that
-explains the change to teammates who will not read the code, such as planners and people on other
-teams. It shows no code. Each scene is a simple picture of the idea (a flow, a before-and-after,
-a structure, or a few points) that builds up while one sentence is read aloud and subtitled.
+You are writing a PR Docent short for pull request {{PR}}: a 30-45 second vertical explainer,
+played with narration in the reviewer's browser, for teammates who will not read the code, such as
+planners and people on other teams. It shows no code. Each scene is a simple picture of the idea
+(a flow, a before-and-after, a structure, or a few points) that builds up while one sentence is
+read aloud and subtitled.
 
 ## Inputs
 

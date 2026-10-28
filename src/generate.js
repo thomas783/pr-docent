@@ -1,5 +1,5 @@
 // Panel side of the local host: asks the service worker to have the user's Claude Code write a
-// tour or render a short for this PR, reporting progress along the way.
+// tour or a short's script for this PR, or to save a short as a video, reporting progress.
 
 import { i18nError } from "./i18n.js";
 
@@ -8,9 +8,14 @@ export function generateLocally(request, onProgress) {
   return askHost("generate", request, onProgress).then((reply) => reply.tour);
 }
 
-/** Resolves with the path of the MP4 the host wrote. */
-export function makeShort(request, onProgress) {
-  return askHost("short", request, onProgress).then((reply) => reply.path);
+/** Resolves with the raw short script. */
+export function writeShortScript(request, onProgress) {
+  return askHost("script", request, onProgress).then((reply) => reply.short);
+}
+
+/** Resolves with the path of the MP4 the host rendered from [short]. */
+export function saveShortVideo(short, onProgress) {
+  return askHost("render", { short }, onProgress).then((reply) => reply.path);
 }
 
 /** Shows a video the host wrote in Finder. */

@@ -2,8 +2,8 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, fetchCommentTour, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
-import { generateLocally, makeShort, revealFile } from "./generate.js";
+import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
@@ -14,6 +14,24 @@ const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
 const SPEECH_LOCALES = { ko: "ko-KR", en: "en-US" };
 
+// Line icons on a 24px grid, drawn in the button's text color.
+const ICONS = {
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
+  prev: '<path d="m15 18-6-6 6-6"/>',
+  next: '<path d="m9 18 6-6-6-6"/>',
+  skipBack: '<path d="M19 20 9 12l10-8v16Z"/><path d="M5 19V5"/>',
+  skipForward: '<path d="m5 4 10 8-10 8V4Z"/><path d="M19 5v14"/>',
+  video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
+  volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  mute: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+};
+const svg = (name, size = 16) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
 export class TourPanel {
   constructor(pr) {
     this.pr = pr;
@@ -23,14 +41,19 @@ export class TourPanel {
     this.narrationToken = 0;
     this.status = "";
     this.generating = null; // progress text while the local generator runs
-    this.shorting = null; // progress text while a short is rendered
-    this.shortPath = null; // the last video made for this PR
+    this.shorting = null; // progress text while a short is written or saved as a video
+    this.short = null; // this PR's short script: made here, or posted with the tour
+    this.videoPath = null; // the last MP4 saved from it
+    this.menuOpen = false;
+    this.summaryOpen = false;
+    this.chaptersOpen = false;
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">▶ PR Docent</button><aside class="panel" hidden></aside>`;
+    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">${svg("play", 12)} PR Docent</button><aside class="panel" hidden></aside><div class="tip" hidden></div>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
+    this.showTips();
     this.unitIndex = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
     this.onKeyDown = (event) => this.handleShortcut(event);
@@ -43,6 +66,12 @@ export class TourPanel {
     };
     chrome.storage?.onChanged.addListener(this.onStorageChange);
     document.body.append(this.host);
+    // Reopen after a full page load (a reload, or a link GitHub didn't route) if it was open.
+    if (sessionGet(this.openKey)) this.toggleOpen();
+  }
+
+  get openKey() {
+    return `prdocent:open:${this.key}`;
   }
 
   /** Interface text in the language picked in the popup (or the browser's). */
@@ -52,6 +81,18 @@ export class TourPanel {
 
   errorText(error) {
     return error.i18n ? this.t(...error.i18n) : error.message;
+  }
+
+  /**
+   * False, with a note to reload, when the extension was reloaded after this page opened: the
+   * page keeps this script, but every chrome.* call fails with "Extension context invalidated".
+   */
+  connected() {
+    if (chrome.runtime?.id) return true;
+    this.menuOpen = false;
+    this.status = this.t("reloadPage");
+    this.render();
+    return false;
   }
 
   handleShortcut(event) {
@@ -66,6 +107,7 @@ export class TourPanel {
   async toggleOpen() {
     const opening = this.panel.hidden;
     this.panel.hidden = !opening;
+    sessionSet(this.openKey, opening);
     this.launcher.classList.toggle("active", opening);
     reservePageSpace(opening);
     if (!opening) {
@@ -80,6 +122,21 @@ export class TourPanel {
     }
   }
 
+  /**
+   * The user moved between this PR's tabs. Highlights only make sense on Files changed (the
+   * Conversation tab has diff snippets too, which they would dim), so drop them elsewhere and
+   * put the current step back on return.
+   */
+  async tabChanged(onDiff) {
+    if (!onDiff) {
+      this.stop();
+      clearHighlight();
+    } else if (!this.panel.hidden && this.player) {
+      await this.focusCurrent();
+    }
+    this.render();
+  }
+
   destroy() {
     document.removeEventListener("keydown", this.onKeyDown, true);
     chrome.storage?.onChanged.removeListener(this.onStorageChange);
@@ -92,11 +149,17 @@ export class TourPanel {
   /* ---------------- loading ---------------- */
 
   async load() {
+    if (!chrome.runtime?.id) {
+      this.status = this.t("reloadPage"); // see connected()
+      return;
+    }
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
-    this.shortPath = (await storageGet(`prdocent:short:${this.key}`)) ?? null;
+    this.videoPath = (await storageGet(`prdocent:video:${this.key}`)) ?? null;
     const stored = await storageGet(`prdocent:tour:${this.key}`);
-    // A tour loaded by hand wins, then one the generate-tour workflow posted, then a bundled example.
-    const raw = stored ?? (await fetchCommentTour(this.pr)) ?? (await fetchBundledTour(this.pr));
+    const posted = await fetchCommentData(this.pr);
+    // What was made or loaded here wins, then what the generate-tour workflow posted, then a bundled example.
+    this.short = (await storageGet(`prdocent:shortscript:${this.key}`)) ?? posted.short;
+    const raw = stored ?? posted.tour ?? (await fetchBundledTour(this.pr));
     if (!raw) return;
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
@@ -119,7 +182,8 @@ export class TourPanel {
 
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
   async generate() {
-    if (this.generating) return;
+    if (this.generating || !this.connected()) return;
+    this.menuOpen = false;
     this.generating = this.t("readingPr");
     this.status = "";
     this.render();
@@ -144,25 +208,45 @@ export class TourPanel {
     }
   }
 
-  /** Has the local host turn this tour into a short video (MP4 in Downloads). */
+  /** Has the user's local Claude Code write a short script from this tour, then plays it. */
   async makeShort() {
-    if (this.shorting || this.generating || !this.player) return;
+    if (this.shorting || this.generating || !this.player || !this.connected()) return;
+    this.menuOpen = false;
     this.shorting = this.t("readingPr");
-    this.shortPath = null;
     this.status = "";
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
       const language = tourLanguage(this.player.tour) === "ko" ? "한국어" : "English";
-      this.shortPath = await makeShort({ pr: this.pr, ...details, tour: this.player.tour, language }, (progress) => {
-        this.shorting = progress.stage === "fetch"
-          ? this.t("fetchingFiles")
-          : progress.stage === "render"
-            ? this.t("shortRender", progress.detail ?? "")
-            : this.t("shortScript", progress.seconds ?? 0);
+      this.short = await writeShortScript({ pr: this.pr, ...details, tour: this.player.tour, language }, (progress) => {
+        this.shorting = progress.stage === "fetch" ? this.t("fetchingFiles") : this.t("shortScript", progress.seconds ?? 0);
         this.render();
       });
-      await storageSet(`prdocent:short:${this.key}`, this.shortPath);
+      await storageSet(`prdocent:shortscript:${this.key}`, this.short);
+      this.shorting = null;
+      this.render();
+      this.playShort();
+    } catch (error) {
+      this.shorting = null;
+      this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
+      this.render();
+    }
+  }
+
+  /** Saves the short as an MP4 in Downloads with the local host (macOS), for sharing as a file. */
+  async saveVideo() {
+    if (this.shorting || !this.short || !this.connected()) return;
+    this.menuOpen = false;
+    this.shorting = this.t("shortRender", "");
+    this.status = "";
+    this.render();
+    try {
+      this.videoPath = await saveShortVideo(this.short, (progress) => {
+        this.shorting = this.t("shortRender", progress.detail ?? "");
+        this.render();
+      });
+      await storageSet(`prdocent:video:${this.key}`, this.videoPath);
+      this.status = this.t("videoSaved", this.videoPath.split("/").pop());
     } catch (error) {
       this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
     }
@@ -170,13 +254,15 @@ export class TourPanel {
     this.render();
   }
 
-  /** Plays a finished short over the page in the extension's own player page. */
-  playVideo(path) {
+  /** Plays the short live over the page, in the extension's own player page. */
+  async playShort() {
+    if (!this.short || !this.connected()) return;
+    await storageSet("prdocent:play", this.short);
     this.root.querySelector(".video-overlay")?.remove();
     const overlay = document.createElement("div");
     overlay.className = "video-overlay";
-    overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL(`player.html?path=${encodeURIComponent(path)}`))}"></iframe>
-      <button class="video-close" aria-label="${esc(this.t("close"))}">✕</button></div>`;
+    overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL("player.html?short=prdocent:play"))}"></iframe>
+      <button class="video-close" aria-label="${esc(this.t("close"))}">${svg("close")}</button></div>`;
     const close = () => overlay.remove();
     overlay.addEventListener("click", (event) => event.target === overlay && close());
     overlay.querySelector(".video-close").addEventListener("click", close);
@@ -195,6 +281,7 @@ export class TourPanel {
       ? ""
       : this.t("tourForOtherPr", `${owner}/${repo}#${number}`);
     await storageSet(`prdocent:tour:${this.key}`, raw);
+    this.menuOpen = false;
     this.stop();
     this.start(tour, 0);
     this.render();
@@ -268,70 +355,127 @@ export class TourPanel {
 
   render() {
     if (this.panel.hidden) return;
+    // Re-rendering replaces the markup; keep the reader's place in the scrolling middle part.
+    const scrolled = this.panel.querySelector(".content")?.scrollTop ?? 0;
+    this.draw();
+    const content = this.panel.querySelector(".content");
+    if (content) content.scrollTop = scrolled;
+  }
+
+  draw() {
     if (!this.player) {
       this.panel.innerHTML = `
         ${this.header()}
-        <p class="muted">${esc(this.t("noTour"))}</p>
-        ${this.generateButton()}
-        ${this.fileInput()}
-        ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}`;
+        <div class="content">
+          <p class="muted">${esc(this.t("noTour"))}</p>
+          ${this.generateButton()}
+          ${this.fileInput()}
+          ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
+        </div>`;
       return this.bind();
     }
     const { tour } = this.player;
     const step = this.player.current;
     const total = this.player.steps.length;
     const uncovered = uncoveredFiles(tour, listPullRequestFiles());
+    const icon = (action, glyph, label, disabled = false, cls = "") =>
+      `<button class="icon ${cls}" data-action="${action}" data-tip="${esc(label)}" aria-label="${esc(label)}" ${disabled ? "disabled" : ""}>${glyph}</button>`;
 
     this.panel.innerHTML = `
       ${this.header()}
-      <h2>${esc(tour.title || this.t("untitledTour"))}</h2>
-      ${this.generateButton(this.t("regenerate"), "compact")}
-      <button class="generate compact" data-action="short" ${this.shorting || this.generating ? "disabled" : ""}>${esc(this.shorting ?? this.t("makeShort"))}</button>
-      ${this.shortPath ? `<p class="saved"><button class="generate compact play" data-action="play">${esc(this.t("playShort"))}</button> ${esc(this.t("shortSaved", this.shortPath.split("/").pop()))} <button class="link" data-action="reveal">${esc(this.t("showInFinder"))}</button></p>` : ""}
-      ${tour.summary ? `<details><summary>${esc(this.t("prSummary"))}</summary><p>${esc(tour.summary)}</p></details>` : ""}
-      <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
-      <p class="muted">${esc(this.t("stepOf", this.player.index + 1, total))}</p>
+      ${this.menuOpen ? this.menu(tour) : ""}
+      <div class="content">
+      <h2 class="title" data-action="summary" data-tip="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
+      ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
+      ${this.activity()}
 
       <section class="step">
         <p class="chapter">${esc(step.chapterTitle)}</p>
-        <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}</p>
-        <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span>
+        <p class="file" data-tip="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}
+          <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span></p>
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
-
-      <div class="controls">
-        <button data-action="prev" ${this.player.isFirst ? "disabled" : ""}>${esc(this.t("previous"))}</button>
-        <button class="primary" data-action="toggle">${esc(this.t(this.player.playing ? "pause" : "play"))}</button>
-        <button data-action="next" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("next"))}</button>
-      </div>
-      <div class="controls focus-nav">
-        <button data-action="previousFocus" ${this.player.findFocus(-1) < 0 ? "disabled" : ""}>${esc(this.t("previousFocus"))}</button>
-        <button data-action="nextFocus" ${this.player.findFocus(1) < 0 ? "disabled" : ""}>${esc(this.t("nextFocus"))}</button>
-      </div>
-      <div class="settings">
-        <label><input type="checkbox" data-action="voice" ${this.settings.voice ? "checked" : ""} ${speechAvailable() ? "" : "disabled"}> ${esc(this.t("narration"))}</label>
-        <select data-action="rate">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
-      </div>
-
-      <h3>${esc(this.t("chapters"))}</h3>
-      <ol class="chapters">
-        ${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}
-      </ol>
-
+      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
       ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
+      </div>
+
+      <div class="footer">
+      <div class="bar">
+        ${icon("previousFocus", svg("skipBack"), this.t("previousFocus"), this.player.findFocus(-1) < 0)}
+        ${icon("prev", svg("prev", 18), this.t("previous"), this.player.isFirst)}
+        ${icon("toggle", svg(this.player.playing ? "pause" : "play"), this.t(this.player.playing ? "pause" : "play"), false, "primary")}
+        ${icon("next", svg("next", 18), this.t("next"), this.player.isLast)}
+        ${icon("nextFocus", svg("skipForward"), this.t("nextFocus"), this.player.findFocus(1) < 0)}
+        <span class="spacer"></span>
+        ${this.short ? icon("play", svg("video"), this.t("watchShort")) : ""}
+        ${icon("voice", svg(this.settings.voice ? "volume" : "mute"), this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
+        <select data-action="rate" aria-label="${esc(this.t("narration"))}">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
+      </div>
+      <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
+      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${svg(this.chaptersOpen ? "up" : "down", 12)}</button>
+      </div>`;
+    this.bind();
+  }
+
+  /** The "More" menu: what people use now and then, out of the way of playback. */
+  menu(tour) {
+    const item = (action, label) => `<button class="item" data-action="${action}" ${this.generating || this.shorting ? "disabled" : ""}>${esc(label)}</button>`;
+    return `<div class="menu">
+      ${item("generate", this.t("regenerate"))}
+      ${item("short", this.t(this.short ? "remakeShort" : "makeShort"))}
+      ${this.short ? item("video", this.t("saveVideo")) : ""}
+      ${this.videoPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
+      ${this.fileInput("item")}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
-      <details><summary>${esc(this.t("loadAnother"))}</summary>${this.fileInput()}</details>`;
-    this.bind();
+    </div>`;
+  }
+
+  /**
+   * Tooltips for [data-tip] elements. The browser's own (title) waits about a second and can't
+   * be sped up, so the panel draws its own, kept inside the window.
+   */
+  showTips() {
+    const tip = this.root.querySelector(".tip");
+    let timer;
+    const hide = () => {
+      clearTimeout(timer);
+      tip.hidden = true;
+    };
+    this.panel.addEventListener("pointerover", (event) => {
+      const target = event.target.closest("[data-tip]");
+      if (!target) return hide();
+      clearTimeout(timer);
+      // Moving from one control to the next shows the next tip right away.
+      timer = setTimeout(() => {
+        tip.textContent = target.dataset.tip;
+        tip.hidden = false;
+        const box = target.getBoundingClientRect();
+        const left = Math.min(Math.max(8, box.left + box.width / 2 - tip.offsetWidth / 2), innerWidth - tip.offsetWidth - 8);
+        const above = box.top - tip.offsetHeight - 6;
+        tip.style.left = `${left}px`;
+        tip.style.top = `${above >= 8 ? above : box.bottom + 6}px`;
+      }, tip.hidden ? 200 : 0);
+    });
+    this.panel.addEventListener("pointerleave", hide);
+    this.panel.addEventListener("click", hide);
+  }
+
+  /** What the local helper is doing, if anything. */
+  activity() {
+    const busy = this.generating ?? this.shorting;
+    return busy ? `<p class="activity"><span class="spinner"></span>${esc(busy)}</p>` : "";
   }
 
   header() {
     const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
     const { owner, repo, number } = this.pr;
-    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a>`;
-    return `<header><strong>PR Docent</strong><button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></header>
+    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
+    return `<header><strong>PR Docent</strong><span>
+        ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${svg(this.menuOpen ? "up" : "down", 12)}</button>` : ""}
+        <button class="close" data-action="close" data-tip="${esc(this.t("close"))}" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
       ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
@@ -339,27 +483,39 @@ export class TourPanel {
     return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
-  fileInput() {
-    return `<label class="file-input">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
+  fileInput(cls = "file-input") {
+    return `<label class="${cls}">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
   }
 
   bind() {
     const on = (action, event, handler) =>
       this.panel.querySelectorAll(`[data-action="${action}"]`).forEach((el) => el.addEventListener(event, handler));
     on("close", "click", () => this.toggleOpen());
+    on("changes", "click", (event) => {
+      // A link inside the panel's shadow root misses GitHub's in-page navigation and reloads the
+      // page; click GitHub's own tab instead when it's there.
+      const tab = document.querySelector(`a[href$="/pull/${this.pr.number}/changes"], a[href$="/pull/${this.pr.number}/files"]`);
+      if (!tab) return;
+      event.preventDefault();
+      tab.click();
+    });
     on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
     on("short", "click", () => this.makeShort());
-    on("reveal", "click", () => this.shortPath && revealFile(this.shortPath).catch(() => {}));
-    on("play", "click", () => this.shortPath && this.playVideo(this.shortPath));
+    on("video", "click", () => this.saveVideo());
+    on("reveal", "click", () => this.videoPath && revealFile(this.videoPath).catch(() => {}));
+    on("play", "click", () => this.playShort());
     if (!this.player) return;
+    on("menu", "click", () => { this.menuOpen = !this.menuOpen; this.render(); });
+    on("summary", "click", () => { this.summaryOpen = !this.summaryOpen; this.render(); });
+    on("chapters", "click", () => { this.chaptersOpen = !this.chaptersOpen; this.render(); });
     on("prev", "click", () => this.player.previous());
     on("next", "click", () => this.player.next());
     on("previousFocus", "click", () => this.player.previousFocus());
     on("nextFocus", "click", () => this.player.nextFocus());
     on("toggle", "click", () => this.player.toggle());
     on("refocus", "click", () => this.focusCurrent().then(() => this.render()));
-    on("voice", "change", (e) => this.updateSettings({ voice: e.target.checked }));
+    on("voice", "click", () => this.updateSettings({ voice: !this.settings.voice }));
     on("rate", "change", (e) => this.updateSettings({ rate: Number(e.target.value) }));
     this.panel.querySelectorAll("[data-chapter]").forEach((li) =>
       li.addEventListener("click", () => this.player.goToChapter(Number(li.dataset.chapter))),
@@ -402,6 +558,24 @@ async function fetchBundledTour(pr) {
   }
 }
 
+/** Per-tab memory that survives reloads (whether the panel was open), never throwing. */
+function sessionGet(key) {
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function sessionSet(key, on) {
+  try {
+    if (on) sessionStorage.setItem(key, "1");
+    else sessionStorage.removeItem(key);
+  } catch {
+    // storage blocked: the panel just starts closed
+  }
+}
+
 async function storageGet(key) {
   try {
     return (await chrome.storage.local.get(key))[key];
@@ -436,25 +610,33 @@ const STYLES = `
     background: #8250df; color: #fff; font-size: 13px; font-weight: 600;
     box-shadow: 0 6px 20px rgba(0,0,0,.25);
   }
+  .launcher { display: inline-flex; align-items: center; gap: 6px; }
   .launcher.active { background: #6639ba; }
   .panel {
-    position: fixed; top: 72px; right: 16px; bottom: 76px; z-index: 2147483000; width: ${PANEL_WIDTH}px; overflow-y: auto;
+    position: fixed; top: 72px; right: 16px; bottom: 76px; z-index: 2147483000; width: ${PANEL_WIDTH}px;
+    display: flex; flex-direction: column; overflow: hidden;
     padding: 14px 16px; border-radius: 12px;
     background: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328);
     border: 1px solid var(--borderColor-default, #d1d9e0); box-shadow: 0 12px 32px rgba(0,0,0,.2);
     font-size: 13px; line-height: 1.5;
   }
   .panel[hidden] { display: none; }
+  .tip { position: fixed; z-index: 2147483001; max-width: 280px; padding: 4px 8px; border-radius: 6px; pointer-events: none;
+    background: #25292e; color: #fff; font-size: 12px; line-height: 1.4; word-break: break-all; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .tip[hidden] { display: none; }
+  /* Header on top, controls pinned at the bottom, everything in between scrolls. */
+  .content { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 0 16px; }
+  .footer { flex: none; padding-top: 8px; border-top: 1px solid var(--borderColor-muted, #d1d9e0b3); }
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   h2 { font-size: 15px; margin: 4px 0 6px; }
-  h3 { font-size: 12px; margin: 16px 0 6px; color: var(--fgColor-muted, #59636e); text-transform: uppercase; letter-spacing: .04em; }
   p { margin: 4px 0; }
   .muted { color: var(--fgColor-muted, #59636e); }
   .status { color: var(--fgColor-attention, #9a6700); }
   a { color: var(--fgColor-accent, #0969da); }
   button, select { font: inherit; }
-  .close { border: 0; background: none; cursor: pointer; color: inherit; font-size: 14px; }
-  .progress { height: 4px; border-radius: 4px; background: var(--bgColor-muted, #eff2f5); overflow: hidden; margin-top: 8px; }
+  .close { display: inline-flex; padding: 2px; border: 0; background: none; cursor: pointer; color: inherit; }
+  svg { flex: none; }
+  .progress { height: 4px; border-radius: 4px; background: var(--bgColor-muted, #eff2f5); overflow: hidden; margin-top: 10px; }
   .progress span { display: block; height: 100%; background: #8250df; }
   .step { margin-top: 10px; padding: 12px; border-radius: 8px; background: var(--bgColor-muted, #f6f8fa); }
   .chapter { font-weight: 600; }
@@ -468,18 +650,33 @@ const STYLES = `
   .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
     background: var(--bgColor-attention-muted, #fff8c5); }
   .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
-  .controls { display: flex; gap: 6px; margin-top: 10px; }
-  .controls button { flex: 1; padding: 6px; border-radius: 6px; cursor: pointer;
+  header > span { display: flex; gap: 6px; align-items: center; }
+  .menu-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; color: inherit;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .menu-toggle:hover, .menu-toggle.open { background: var(--bgColor-muted, #f6f8fa); border-color: #8250df; }
+  .title { cursor: pointer; }
+  .summary { color: var(--fgColor-muted, #59636e); }
+  .activity { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .spinner { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .where { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 0; border: 0; background: none; cursor: pointer; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .menu { display: flex; flex-direction: column; margin: 0 0 10px; padding: 6px; border-radius: 8px;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
+  .menu .item { display: block; text-align: left; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
+  .menu .item:hover:not(:disabled) { background: var(--bgColor-neutral-muted, rgba(175, 184, 193, .2)); }
+  .menu .item:disabled { opacity: .5; cursor: default; }
+  .menu details { margin: 4px 8px; }
+  .bar { display: flex; align-items: center; gap: 4px; }
+  .bar .spacer { flex: 1; }
+  .icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }
-  .controls button.primary { background: #8250df; border-color: #8250df; color: #fff; }
-  .controls button:disabled { opacity: .4; cursor: default; }
-  .focus-nav { margin-top: 6px; }
-  .focus-nav button { font-size: 12px; }
+  .icon.primary { width: 48px; background: #8250df; border-color: #8250df; color: #fff; }
+  .icon:disabled { opacity: .35; cursor: default; }
+  .file .level { margin: 0 0 0 6px; vertical-align: 1px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   .shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; }
   .shortcuts dt { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
   .shortcuts dd { margin: 0; color: var(--fgColor-muted, #59636e); }
-  .settings { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-  .chapters { margin: 0; padding-left: 20px; }
+  .chapters { margin: 6px 0 0; padding-left: 20px; }
   .chapters li { padding: 4px 0; cursor: pointer; }
   .chapters li.current b { color: #8250df; }
   .chapters small, ul small { display: block; color: var(--fgColor-muted, #59636e); }
@@ -490,8 +687,6 @@ const STYLES = `
   .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
     border: 0; background: #8250df; color: #fff; font-weight: 600; }
   .generate:disabled { opacity: .7; cursor: default; }
-  .saved { font-size: 12px; color: var(--fgColor-success, #1a7f37); }
-  .generate.compact.play { margin: 0 6px 0 0; }
   .video-overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(1, 4, 9, .72);
     display: flex; align-items: center; justify-content: center; }
   .video-box { position: relative; height: min(88vh, 960px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
@@ -499,9 +694,6 @@ const STYLES = `
   .video-box iframe { width: 100%; height: 100%; border: 0; }
   .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
-  .link { border: 0; background: none; padding: 0; color: var(--fgColor-accent, #0969da); cursor: pointer; text-decoration: underline; font-size: 12px; }
-  .generate.compact { display: inline-block; width: auto; margin: 0 0 4px; padding: 3px 10px; font-size: 12px; font-weight: 500;
-    border: 1px solid #8250df; background: transparent; color: #8250df; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;

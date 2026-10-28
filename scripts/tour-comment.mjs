@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 // Renders a tour as the PR comment the generate-tour workflow posts.
 //
-//   node scripts/tour-comment.mjs <tour.json> > comment.md
+//   node scripts/tour-comment.mjs <tour.json> [short.json] > comment.md
 //
 // People read the summary; the PR Docent extension reads the JSON block in the folded section.
 // The first line marks the comment so the workflow updates it instead of posting a new one.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { parseShort } from "../src/short.js";
 import { flattenSteps, parseTour } from "../src/tour.js";
 
 export const MARKER = "<!-- pr-docent:tour -->";
 const MAX_COMMENT_LENGTH = 65000; // GitHub rejects comment bodies over 65536 characters
 
-export function renderComment(raw) {
+/** The comment for a tour and, when there is one, the short made from it. */
+export function renderComment(raw, shortRaw = null) {
   const { tour, errors } = parseTour(raw);
   if (errors.length) throw new Error(`Invalid tour: ${errors.join("; ")}`);
   const steps = flattenSteps(tour);
@@ -38,19 +40,26 @@ export function renderComment(raw) {
     for (const s of tour.skipped) lines.push(`- \`${s.file}\` ${s.reason}`);
     lines.push("", "</details>");
   }
-  // A ``` inside a note would end the code block early; ` is the same backtick to JSON.
-  const json = JSON.stringify(raw).replace(/`/g, "\\u0060");
-  lines.push("", "<details><summary>투어 JSON (PR Docent 확장이 읽습니다)</summary>", "", "```json", json, "```", "", "</details>", "");
+  const short = shortRaw && parseShort(shortRaw).short;
+  if (short) {
+    lines.push("", `### 🎬 쇼츠: ${short.title}`, "", short.hook, "", "Files changed 탭의 PR Docent 패널에서 **🎬 쇼츠 보기**로 재생됩니다.");
+    for (const scene of short.scenes) lines.push(`- **${scene.headline}** ${scene.narration}`);
+  }
+  // A ``` inside a note would end the code block early; \u0060 is the same backtick to JSON.
+  const block = (value) => ["```json", JSON.stringify(value).replace(/`/g, "\\u0060"), "```"];
+  lines.push("", "<details><summary>투어 JSON (PR Docent 확장이 읽습니다)</summary>", "", ...block(raw), "", "</details>", "");
+  if (short) lines.push("<details><summary>쇼츠 대본 JSON (PR Docent 확장이 읽습니다)</summary>", "", ...block(shortRaw), "", "</details>", "");
   const body = lines.join("\n");
   if (body.length > MAX_COMMENT_LENGTH) throw new Error(`Comment is ${body.length} characters; GitHub allows ${MAX_COMMENT_LENGTH}`);
   return body;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [tourPath] = process.argv.slice(2);
+  const [tourPath, shortPath] = process.argv.slice(2);
   if (!tourPath) {
-    console.error("usage: node scripts/tour-comment.mjs <tour.json>");
+    console.error("usage: node scripts/tour-comment.mjs <tour.json> [short.json]");
     process.exit(2);
   }
-  process.stdout.write(renderComment(JSON.parse(readFileSync(tourPath, "utf8"))));
+  const read = (path) => JSON.parse(readFileSync(path, "utf8"));
+  process.stdout.write(renderComment(read(tourPath), shortPath && existsSync(shortPath) ? read(shortPath) : null));
 }

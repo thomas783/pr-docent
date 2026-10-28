@@ -10,7 +10,7 @@ let mountedFor = null;
 function sync() {
   const pr = parsePullRequestPath(location.pathname);
   const key = pr ? `${pr.owner}/${pr.repo}/${pr.number}` : null;
-  if (key === mountedFor) return;
+  if (key === mountedFor) return panel?.tabChanged(pr.onDiff); // e.g. Files changed → Conversation
   panel?.destroy();
   panel = pr ? new TourPanel(pr) : null;
   mountedFor = key;

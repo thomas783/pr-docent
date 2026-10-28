@@ -1,7 +1,7 @@
-// Local generator: Chrome starts this through native messaging when the panel asks for a tour
-// or a short. Tours: Claude Code (the user's own subscription, no API key) writes one with the
-// same prompt and checker as the GitHub Actions workflow. Shorts: see short.mjs. Installed by
-// `pr-docent install` (bin/pr-docent.mjs).
+// Local generator: Chrome starts this through native messaging when the panel asks for a tour,
+// a short script, or a video file. Tours: Claude Code (the user's own subscription, no API key)
+// writes one with the same prompt and checker as the GitHub Actions workflow. Shorts: see
+// short.mjs. Installed by `pr-docent install` (bin/pr-docent.mjs).
 
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,7 +12,7 @@ import { buildPrompt, checkBrevity, parseGuidelines } from "../src/guidelines.js
 import { parseTour } from "../src/tour.js";
 import { prepareWorkspace, runClaude, stopClaude } from "./claude.mjs";
 import { createDecoder, encodeMessage } from "./native.mjs";
-import { generateShort } from "./short.mjs";
+import { saveShortVideo, writeShortScript } from "./short.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const send = (message) => process.stdout.write(encodeMessage(message));
@@ -28,13 +28,14 @@ process.stdin.on(
         .finally(() => process.stdout.write("", () => process.exit(0)));
     if (message.type === "generate") {
       reply(generate(message), (tour) => ({ type: "done", tour }));
-    } else if (message.type === "short") {
+    } else if (message.type === "script") {
       const onProgress = (progress) => send({ type: "progress", ...progress });
-      reply(generateShort({ ...message, onProgress }), (path) => ({ type: "done", path }));
+      reply(writeShortScript({ ...message, onProgress }), (short) => ({ type: "done", short }));
+    } else if (message.type === "render") {
+      const onProgress = (progress) => send({ type: "progress", ...progress });
+      reply(saveShortVideo({ short: message.short, onProgress }), (path) => ({ type: "done", path }));
     } else if (message.type === "reveal") {
       reply(reveal(message.path), () => ({ type: "done" }));
-    } else if (message.type === "read") {
-      reply(readVideo(message.path), () => ({ type: "done" }));
     }
   }),
 );
@@ -44,25 +45,10 @@ process.stdin.on("end", () => {
   process.exit(0);
 });
 
-// Only files this tool writes: pr-docent-*.mp4.
-const isVideo = (path) => /\/pr-docent-[^/]+\.mp4$/.test(String(path)) && existsSync(path);
-// Chrome accepts at most 1 MB per message from a host; base64 grows data by a third.
-const CHUNK_BYTES = 600_000;
-
-/** Shows a finished video in Finder. */
+/** Shows a saved video in Finder; only files this tool writes (pr-docent-*.mp4). */
 function reveal(path) {
-  if (!isVideo(path)) return Promise.reject(new Error("Not a PR Docent video"));
+  if (!/\/pr-docent-[^/]+\.mp4$/.test(String(path)) || !existsSync(path)) return Promise.reject(new Error("Not a PR Docent video"));
   return new Promise((done) => execFile("open", ["-R", path], () => done()));
-}
-
-/** Sends a finished video to the extension's player in base64 chunks under the message limit. */
-async function readVideo(path) {
-  if (!isVideo(path)) throw new Error("Not a PR Docent video");
-  const data = readFileSync(path);
-  const total = Math.ceil(data.length / CHUNK_BYTES);
-  for (let index = 0; index < total; index++) {
-    send({ type: "chunk", index, total, data: data.subarray(index * CHUNK_BYTES, (index + 1) * CHUNK_BYTES).toString("base64") });
-  }
 }
 
 async function generate({ pr, title, body, headSha, diff, files, guidelines = "", model, language }) {
