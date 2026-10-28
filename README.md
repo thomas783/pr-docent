@@ -39,6 +39,15 @@ GitHub's diff view already uses the arrow keys and single letters, so PR Docent 
 | `Alt` + `↓` / `↑` | Skip to the next / previous **focus** step |
 | `Alt` + `P` | Play / pause |
 
+## Try it
+
+Two demo pull requests stay open for trying PR Docent: the same small change (locking a name after five failed logins), toured in each language. With the extension installed, open one and click **PR Docent** on Files changed.
+
+- English: [#22 Lock out repeated failed logins](https://github.com/thomas783/pr-docent/pull/22/changes)
+- 한국어: [#23 로그인 연속 실패 시 잠금](https://github.com/thomas783/pr-docent/pull/23/changes)
+
+They target the `demo/base` branch, which holds the demo's code; neither is ever merged into `main`.
+
 ## Install (development)
 
 1. Turn on **Developer mode** in `chrome://extensions`.
