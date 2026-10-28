@@ -69,6 +69,22 @@ export async function fetchPullRequestDetails(pr) {
   };
 }
 
+/**
+ * What the PR's diff is now: { head, base, commits }, the head commit, the merge base the diff is
+ * taken against (GitHub's baseSha is the target branch's tip instead), and the PR's commit ids.
+ * Read from the Files changed page with the viewer's session, so private repositories work too.
+ */
+export async function fetchPullRequestRevision(pr) {
+  const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}/changes`, { credentials: "include" });
+  if (!response.ok) throw i18nError("prPageFailed", response.status);
+  const html = await response.text();
+  const head = html.match(/"headSha":"([0-9a-f]{40})"/)?.[1];
+  const base = html.match(/"oldCommitOid":"([0-9a-f]{40})"/)?.[1];
+  if (!head || !base) return null;
+  const commits = [...new Set([...html.matchAll(/"oid":"([0-9a-f]{40})"/g)].map((m) => m[1]))];
+  return { head, base, commits };
+}
+
 async function fetchConversation(pr) {
   const response = await fetch(`/${pr.owner}/${pr.repo}/pull/${pr.number}`, { credentials: "include" });
   if (!response.ok) throw i18nError("prPageFailed", response.status);

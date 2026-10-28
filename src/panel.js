@@ -2,14 +2,14 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, fetchPullRequestRevision, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
 import { svg } from "./icons.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
-import { narrationUnits, parseTour, tourFileName, tourLanguage, uncoveredFiles } from "./tour.js";
+import { narrationUnits, parseTour, pickTour, tourFileName, tourFreshness, tourLanguage, uncoveredFiles } from "./tour.js";
 
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
@@ -141,10 +141,12 @@ export class TourPanel {
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
     this.videoPath = (await storageGet(`prdocent:video:${this.key}`)) ?? null;
     const stored = await storageGet(`prdocent:tour:${this.key}`);
-    const posted = await fetchCommentData(this.pr);
-    // What was made or loaded here wins, then what the generate-tour workflow posted, then a bundled example.
+    const [posted, revision] = await Promise.all([fetchCommentData(this.pr), fetchPullRequestRevision(this.pr).catch(() => null)]);
+    this.revision = revision;
     this.short = (await storageGet(`prdocent:shortscript:${this.key}`)) ?? posted.short;
-    const raw = stored ?? posted.tour ?? (await fetchBundledTour(this.pr));
+    // The tour made here, or the one the generate-tour workflow posted when only that one matches
+    // the PR's current commits, then a bundled example.
+    const raw = pickTour(stored, posted.tour, revision) ?? (await fetchBundledTour(this.pr));
     if (!raw) return;
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
@@ -163,6 +165,8 @@ export class TourPanel {
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
+      // The commits this tour is made for, read before the diff so a push meanwhile shows as newer.
+      const revision = await fetchPullRequestRevision(this.pr).catch(() => null);
       // Write the tour in the interface language.
       const language = resolveLanguage(this.settings.language, navigator.language) === "ko" ? "한국어" : "English";
       const raw = await generateLocally({ pr: this.pr, ...details, language }, (progress) => {
@@ -171,6 +175,10 @@ export class TourPanel {
           : this.t("writingTour", progress.seconds ?? 0);
         this.render();
       });
+      if (revision) {
+        raw.pr = { ...raw.pr, head: revision.head, base: revision.base };
+        this.revision = revision;
+      }
       this.generating = null;
       await this.useTour(raw);
       await this.focusCurrent();
@@ -265,6 +273,7 @@ export class TourPanel {
   }
 
   start(tour, position) {
+    this.freshness = tourFreshness(tour.pr, this.revision);
     this.player = new Player(tour, { startAt: position });
     this.player.onChange((reason) => this.onPlayerChange(reason));
   }
@@ -369,6 +378,7 @@ export class TourPanel {
       <div class="content">
       <h2 class="title" data-action="summary" data-tip="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
       ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
+      ${this.freshnessNote()}
       ${this.activity()}
 
       <section class="step">
@@ -458,6 +468,17 @@ export class TourPanel {
   skipViewed() {
     if (this.player.isLast) return;
     this.player.next();
+  }
+
+  /** Says when the tour was made for other commits than the PR has now. */
+  freshnessNote() {
+    if (!this.freshness || this.freshness === "current") return "";
+    if (this.freshness === "unknown") {
+      // Only for tours without recorded commits; if the PR couldn't be read, there's nothing to say.
+      return this.player.tour.pr.head ? "" : `<p class="muted">${esc(this.t("staleUnknown"))}</p>`;
+    }
+    return `<div class="stale"><p>${esc(this.t(`stale_${this.freshness}`))}</p>
+      <button data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.t("regenerate"))}</button></div>`;
   }
 
   /** What the local helper is doing, if anything. */
@@ -633,6 +654,11 @@ const STYLES = `
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
   .ask button:first-of-type { background: #8250df; border-color: #8250df; color: #fff; }
   .ask button:disabled { opacity: .5; cursor: default; }
+  .stale { margin: 6px 0; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #bf8700; background: var(--bgColor-attention-muted, #fff8c5); }
+  .stale p { margin: 0 0 6px; }
+  .stale button { padding: 3px 10px; border-radius: 6px; cursor: pointer; color: inherit; font-size: 12px;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .stale button:disabled { opacity: .5; cursor: default; }
   a { color: var(--fgColor-accent, #0969da); }
   button, select { font: inherit; }
   .close { display: inline-flex; padding: 2px; border: 0; background: none; cursor: pointer; color: inherit; }
