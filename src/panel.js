@@ -25,6 +25,9 @@ export class TourPanel {
     this.generating = null; // progress text while the local generator runs
     this.shorting = null; // progress text while a short is rendered
     this.shortPath = null; // the last video made for this PR
+    this.menuOpen = false;
+    this.summaryOpen = false;
+    this.chaptersOpen = false;
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
@@ -92,6 +95,11 @@ export class TourPanel {
   /* ---------------- loading ---------------- */
 
   async load() {
+    // After the extension is reloaded, pages opened before it keep this script but lose chrome.*.
+    if (!chrome.runtime?.id) {
+      this.status = this.t("reloadPage");
+      return;
+    }
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
     this.shortPath = (await storageGet(`prdocent:short:${this.key}`)) ?? null;
     const stored = await storageGet(`prdocent:tour:${this.key}`);
@@ -120,6 +128,7 @@ export class TourPanel {
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
   async generate() {
     if (this.generating) return;
+    this.menuOpen = false;
     this.generating = this.t("readingPr");
     this.status = "";
     this.render();
@@ -147,6 +156,7 @@ export class TourPanel {
   /** Has the local host turn this tour into a short video (MP4 in Downloads). */
   async makeShort() {
     if (this.shorting || this.generating || !this.player) return;
+    this.menuOpen = false;
     this.shorting = this.t("readingPr");
     this.shortPath = null;
     this.status = "";
@@ -195,6 +205,7 @@ export class TourPanel {
       ? ""
       : this.t("tourForOtherPr", `${owner}/${repo}#${number}`);
     await storageSet(`prdocent:tour:${this.key}`, raw);
+    this.menuOpen = false;
     this.stop();
     this.start(tour, 0);
     this.render();
@@ -281,57 +292,71 @@ export class TourPanel {
     const step = this.player.current;
     const total = this.player.steps.length;
     const uncovered = uncoveredFiles(tour, listPullRequestFiles());
+    const icon = (action, glyph, label, disabled = false, cls = "") =>
+      `<button class="icon ${cls}" data-action="${action}" title="${esc(label)}" aria-label="${esc(label)}" ${disabled ? "disabled" : ""}>${glyph}</button>`;
 
     this.panel.innerHTML = `
       ${this.header()}
-      <h2>${esc(tour.title || this.t("untitledTour"))}</h2>
-      ${this.generateButton(this.t("regenerate"), "compact")}
-      <button class="generate compact" data-action="short" ${this.shorting || this.generating ? "disabled" : ""}>${esc(this.shorting ?? this.t("makeShort"))}</button>
-      ${this.shortPath ? `<p class="saved"><button class="generate compact play" data-action="play">${esc(this.t("playShort"))}</button> ${esc(this.t("shortSaved", this.shortPath.split("/").pop()))} <button class="link" data-action="reveal">${esc(this.t("showInFinder"))}</button></p>` : ""}
-      ${tour.summary ? `<details><summary>${esc(this.t("prSummary"))}</summary><p>${esc(tour.summary)}</p></details>` : ""}
+      ${this.menuOpen ? this.menu(tour) : ""}
+      <h2 class="title" data-action="summary" title="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
+      ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
+      ${this.activity()}
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
-      <p class="muted">${esc(this.t("stepOf", this.player.index + 1, total))}</p>
+      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${this.chaptersOpen ? "▴" : "▾"}</button>
+      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
 
       <section class="step">
         <p class="chapter">${esc(step.chapterTitle)}</p>
-        <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}</p>
-        <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span>
+        <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}
+          <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span></p>
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
 
-      <div class="controls">
-        <button data-action="prev" ${this.player.isFirst ? "disabled" : ""}>${esc(this.t("previous"))}</button>
-        <button class="primary" data-action="toggle">${esc(this.t(this.player.playing ? "pause" : "play"))}</button>
-        <button data-action="next" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("next"))}</button>
-      </div>
-      <div class="controls focus-nav">
-        <button data-action="previousFocus" ${this.player.findFocus(-1) < 0 ? "disabled" : ""}>${esc(this.t("previousFocus"))}</button>
-        <button data-action="nextFocus" ${this.player.findFocus(1) < 0 ? "disabled" : ""}>${esc(this.t("nextFocus"))}</button>
-      </div>
-      <div class="settings">
-        <label><input type="checkbox" data-action="voice" ${this.settings.voice ? "checked" : ""} ${speechAvailable() ? "" : "disabled"}> ${esc(this.t("narration"))}</label>
-        <select data-action="rate">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
+      <div class="bar">
+        ${icon("previousFocus", "⏮", this.t("previousFocus"), this.player.findFocus(-1) < 0)}
+        ${icon("prev", "◀", this.t("previous"), this.player.isFirst)}
+        ${icon("toggle", this.player.playing ? "❚❚" : "▶", this.t(this.player.playing ? "pause" : "play"), false, "primary")}
+        ${icon("next", "▶", this.t("next"), this.player.isLast)}
+        ${icon("nextFocus", "⏭", this.t("nextFocus"), this.player.findFocus(1) < 0)}
+        <span class="spacer"></span>
+        ${icon("voice", this.settings.voice ? "🔊" : "🔇", this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
+        <select data-action="rate" aria-label="${esc(this.t("narration"))}">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
       </div>
 
-      <h3>${esc(this.t("chapters"))}</h3>
-      <ol class="chapters">
-        ${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}
-      </ol>
+      ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}`;
+    this.bind();
+  }
 
-      ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
+  /** The ⋯ menu: what people use now and then, out of the way of playback. */
+  menu(tour) {
+    const item = (action, label) => `<button class="item" data-action="${action}" ${this.generating || this.shorting ? "disabled" : ""}>${esc(label)}</button>`;
+    return `<div class="menu">
+      ${item("generate", this.t("regenerate"))}
+      ${item("short", this.t("makeShort"))}
+      ${this.shortPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
+      ${this.fileInput("item")}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
-      <details><summary>${esc(this.t("loadAnother"))}</summary>${this.fileInput()}</details>`;
-    this.bind();
+    </div>`;
+  }
+
+  /** What the local host is doing, or the last short ready to play. */
+  activity() {
+    const busy = this.generating ?? this.shorting;
+    if (busy) return `<p class="activity">⏳ ${esc(busy)}</p>`;
+    if (this.shortPath) return `<p class="activity"><button class="link" data-action="play">${esc(this.t("playShort"))}</button></p>`;
+    return "";
   }
 
   header() {
     const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
     const { owner, repo, number } = this.pr;
     const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a>`;
-    return `<header><strong>PR Docent</strong><button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></header>
+    return `<header><strong>PR Docent</strong><span>
+        ${this.player ? `<button class="close" data-action="menu" aria-label="${esc(this.t("more"))}" title="${esc(this.t("more"))}">⋯</button>` : ""}
+        <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></span></header>
       ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
@@ -339,8 +364,8 @@ export class TourPanel {
     return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
-  fileInput() {
-    return `<label class="file-input">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
+  fileInput(cls = "file-input") {
+    return `<label class="${cls}">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
   }
 
   bind() {
@@ -353,13 +378,16 @@ export class TourPanel {
     on("reveal", "click", () => this.shortPath && revealFile(this.shortPath).catch(() => {}));
     on("play", "click", () => this.shortPath && this.playVideo(this.shortPath));
     if (!this.player) return;
+    on("menu", "click", () => { this.menuOpen = !this.menuOpen; this.render(); });
+    on("summary", "click", () => { this.summaryOpen = !this.summaryOpen; this.render(); });
+    on("chapters", "click", () => { this.chaptersOpen = !this.chaptersOpen; this.render(); });
     on("prev", "click", () => this.player.previous());
     on("next", "click", () => this.player.next());
     on("previousFocus", "click", () => this.player.previousFocus());
     on("nextFocus", "click", () => this.player.nextFocus());
     on("toggle", "click", () => this.player.toggle());
     on("refocus", "click", () => this.focusCurrent().then(() => this.render()));
-    on("voice", "change", (e) => this.updateSettings({ voice: e.target.checked }));
+    on("voice", "click", () => this.updateSettings({ voice: !this.settings.voice }));
     on("rate", "change", (e) => this.updateSettings({ rate: Number(e.target.value) }));
     this.panel.querySelectorAll("[data-chapter]").forEach((li) =>
       li.addEventListener("click", () => this.player.goToChapter(Number(li.dataset.chapter))),
@@ -447,7 +475,6 @@ const STYLES = `
   .panel[hidden] { display: none; }
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   h2 { font-size: 15px; margin: 4px 0 6px; }
-  h3 { font-size: 12px; margin: 16px 0 6px; color: var(--fgColor-muted, #59636e); text-transform: uppercase; letter-spacing: .04em; }
   p { margin: 4px 0; }
   .muted { color: var(--fgColor-muted, #59636e); }
   .status { color: var(--fgColor-attention, #9a6700); }
@@ -468,18 +495,28 @@ const STYLES = `
   .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
     background: var(--bgColor-attention-muted, #fff8c5); }
   .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
-  .controls { display: flex; gap: 6px; margin-top: 10px; }
-  .controls button { flex: 1; padding: 6px; border-radius: 6px; cursor: pointer;
+  header > span { display: flex; gap: 4px; }
+  .title { cursor: pointer; }
+  .summary { color: var(--fgColor-muted, #59636e); }
+  .activity { font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .where { margin-top: 4px; padding: 0; border: 0; background: none; cursor: pointer; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .menu { display: flex; flex-direction: column; margin: 0 0 10px; padding: 6px; border-radius: 8px;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
+  .menu .item { display: block; text-align: left; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
+  .menu .item:hover:not(:disabled) { background: var(--bgColor-neutral-muted, rgba(175, 184, 193, .2)); }
+  .menu .item:disabled { opacity: .5; cursor: default; }
+  .menu details { margin: 4px 8px; }
+  .bar { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+  .bar .spacer { flex: 1; }
+  .icon { width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer; font-size: 13px;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }
-  .controls button.primary { background: #8250df; border-color: #8250df; color: #fff; }
-  .controls button:disabled { opacity: .4; cursor: default; }
-  .focus-nav { margin-top: 6px; }
-  .focus-nav button { font-size: 12px; }
+  .icon.primary { width: 48px; background: #8250df; border-color: #8250df; color: #fff; }
+  .icon:disabled { opacity: .35; cursor: default; }
+  .file .level { margin: 0 0 0 6px; vertical-align: 1px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   .shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; }
   .shortcuts dt { font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
   .shortcuts dd { margin: 0; color: var(--fgColor-muted, #59636e); }
-  .settings { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-  .chapters { margin: 0; padding-left: 20px; }
+  .chapters { margin: 6px 0 0; padding-left: 20px; }
   .chapters li { padding: 4px 0; cursor: pointer; }
   .chapters li.current b { color: #8250df; }
   .chapters small, ul small { display: block; color: var(--fgColor-muted, #59636e); }
@@ -490,8 +527,6 @@ const STYLES = `
   .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
     border: 0; background: #8250df; color: #fff; font-weight: 600; }
   .generate:disabled { opacity: .7; cursor: default; }
-  .saved { font-size: 12px; color: var(--fgColor-success, #1a7f37); }
-  .generate.compact.play { margin: 0 6px 0 0; }
   .video-overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(1, 4, 9, .72);
     display: flex; align-items: center; justify-content: center; }
   .video-box { position: relative; height: min(88vh, 960px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
@@ -500,8 +535,6 @@ const STYLES = `
   .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
   .link { border: 0; background: none; padding: 0; color: var(--fgColor-accent, #0969da); cursor: pointer; text-decoration: underline; font-size: 12px; }
-  .generate.compact { display: inline-block; width: auto; margin: 0 0 4px; padding: 3px 10px; font-size: 12px; font-weight: 500;
-    border: 1px solid #8250df; background: transparent; color: #8250df; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;
