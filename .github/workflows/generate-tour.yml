@@ -88,6 +88,18 @@ jobs:
       - name: Check the tour
         run: node "$TOOLS/scripts/check-tour.mjs" "$OUT/tour.json" "$OUT/pr.diff" "$PR" --guidelines "$OUT/guidelines.md"
 
+      # The extension compares these with the PR to tell when the tour is out of date. base is the
+      # merge base the diff is taken against, not the target branch's tip.
+      - name: Record the commits the tour is for
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          merge_base=$(gh api "repos/${{ github.repository }}/compare/$BASE_SHA...$HEAD_SHA" --jq .merge_base_commit.sha)
+          jq --arg head "$HEAD_SHA" --arg base "$merge_base" '.pr.head = $head | .pr.base = $base' "$OUT/tour.json" > "$RUNNER_TEMP/tour.json"
+          mv "$RUNNER_TEMP/tour.json" "$OUT/tour.json"
+
       # A short (a picture-based explanation the extension plays live) is a bonus: if writing or
       # checking it fails, the tour is still posted without it.
       - name: Write the short with Claude Code

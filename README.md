@@ -175,6 +175,7 @@ The file is read from the pull request's head commit, so a pull request that cha
 | `note` | A string, or a list `[{ "text": "...", "lines": [start, end] }, ...]` so the lines each sentence talks about are framed while it is read. |
 | `point` | What the reviewer should check (optional). Shown in its own box and read after the note. |
 | `skipped` | Files left out on purpose, with a reason. They don't count as uncovered. |
+| `pr.head`, `pr.base` | The PR's head commit and the diff's merge base when the tour was made. Added by the workflow and the local helper, not by Claude. The panel compares them with the PR and says when new commits were pushed, the history was rewritten (force push, rebase, fixup) or the base changed, and a posted tour that matches the PR wins over an outdated local one. |
 
 ## How it hooks into GitHub
 
