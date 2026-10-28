@@ -1,6 +1,6 @@
 // Service worker: relays the panel's requests to the local host, which runs the user's own
-// Claude Code: "generate" writes a tour, "short" renders a video, "reveal" shows one in Finder.
-// For the first two it fetches the diff and the changed files (host permissions get past the
+// Claude Code: "generate" writes a tour, "script" a short's script, "render" saves a short as an
+// MP4 and "reveal" shows one in Finder. For the first two it fetches the diff and the changed files (host permissions get past the
 // cross-origin redirects GitHub uses for .diff and raw files, and the viewer's session covers
 // private repositories).
 
@@ -10,7 +10,7 @@ import { GUIDELINES_PATH } from "./guidelines.js";
 const HOST_NAME = "dev.prdocent.host";
 const MAX_FILE_BYTES = 1_000_000;
 
-const HANDLERS = { generate, short, reveal, video };
+const HANDLERS = { generate, script, render, reveal };
 
 chrome.runtime.onConnect.addListener((port) => {
   const handler = HANDLERS[port.name];
@@ -28,18 +28,18 @@ async function generate(port, { pr, title, body, headSha, language }) {
   relay(port, { type: "generate", pr, title, body, headSha, diff, files, guidelines, language });
 }
 
-async function short(port, { pr, title, body, headSha, tour, language }) {
+async function script(port, { pr, title, body, headSha, tour, language }) {
   const { diff, files } = await collect(port, pr, headSha);
   port.postMessage({ type: "progress", stage: "script", seconds: 0 });
-  relay(port, { type: "short", pr, title, body, headSha, tour, diff, files, language });
+  relay(port, { type: "script", pr, title, body, headSha, tour, diff, files, language });
+}
+
+async function render(port, { short }) {
+  relay(port, { type: "render", short });
 }
 
 async function reveal(port, { path }) {
   relay(port, { type: "reveal", path });
-}
-
-async function video(port, { path }) {
-  relay(port, { type: "read", path });
 }
 
 /** The PR's diff and the text of its changed files at the head commit. */

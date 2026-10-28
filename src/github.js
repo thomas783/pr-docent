@@ -9,6 +9,7 @@
 // - comment bodies are server-rendered (.comment-body) on the Conversation page
 
 import { i18nError } from "./i18n.js";
+import { findShortInBlocks } from "./short.js";
 import { findTourInBlocks } from "./tour.js";
 
 // Highlights are CSS rules keyed on GitHub's own anchors rather than classes on elements:
@@ -39,16 +40,17 @@ export async function sha256Hex(text) {
 }
 
 /**
- * The tour posted in the PR's comments (by the generate-tour workflow), or null. Reads the
- * Conversation page with the viewer's own session, so it works on private repositories too.
+ * The tour and the short posted in the PR's comments (by the generate-tour workflow), each or
+ * null. Reads the Conversation page with the viewer's own session, so it works on private
+ * repositories too.
  */
-export async function fetchCommentTour(pr) {
+export async function fetchCommentData(pr) {
   try {
     const { page } = await fetchConversation(pr);
     const blocks = [...page.querySelectorAll(".comment-body pre")].map((pre) => pre.textContent);
-    return findTourInBlocks(blocks, pr);
+    return { tour: findTourInBlocks(blocks, pr), short: findShortInBlocks(blocks, pr) };
   } catch {
-    return null;
+    return { tour: null, short: null };
   }
 }
 

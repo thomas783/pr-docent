@@ -155,7 +155,8 @@ export function findTourInBlocks(blocks, { owner, repo, number }) {
     } catch {
       continue;
     }
-    if (raw?.version === 1 && raw.pr?.owner === owner && raw.pr?.repo === repo && raw.pr?.number === number) found = raw;
+    const forThisPr = raw?.version === 1 && raw.pr?.owner === owner && raw.pr?.repo === repo && raw.pr?.number === number;
+    if (forThisPr && Array.isArray(raw.chapters)) found = raw; // a short in the same comment has scenes instead
   }
   return found;
 }

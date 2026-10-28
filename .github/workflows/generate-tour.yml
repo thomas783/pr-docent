@@ -1,5 +1,5 @@
-# Generates a PR Docent tour for a pull request with Claude Code and posts it as a PR comment
-# that the extension picks up. Call it from a workflow triggered by pull_request:
+# Generates a PR Docent tour and a short for a pull request with Claude Code and posts them as
+# a PR comment that the extension picks up. Call it from a workflow triggered by pull_request:
 #
 #   jobs:
 #     tour:
@@ -88,11 +88,26 @@ jobs:
       - name: Check the tour
         run: node "$TOOLS/scripts/check-tour.mjs" "$OUT/tour.json" "$OUT/pr.diff" "$PR" --guidelines "$OUT/guidelines.md"
 
+      # A short (a picture-based explanation the extension plays live) is a bonus: if writing or
+      # checking it fails, the tour is still posted without it.
+      - name: Write the short with Claude Code
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          LANGUAGE: ${{ inputs.language }}
+        run: |
+          node "$TOOLS/scripts/build-prompt.mjs" "$PR" "$OUT" "$TOOLS" "$LANGUAGE" short > "$RUNNER_TEMP/short-prompt.md"
+          claude -p "$(cat "$RUNNER_TEMP/short-prompt.md")" \
+            --model "${{ inputs.model }}" \
+            --permission-mode dontAsk \
+            --allowedTools "Read,Glob,Grep,Edit(/$OUT/short.json),Bash(node $TOOLS/scripts/check-short.mjs:*)"
+          node "$TOOLS/scripts/check-short.mjs" "$OUT/short.json" "$PR" || rm -f "$OUT/short.json"
+
       - name: Post or update the tour comment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node "$TOOLS/scripts/tour-comment.mjs" "$OUT/tour.json" > "$RUNNER_TEMP/comment.md"
+          node "$TOOLS/scripts/tour-comment.mjs" "$OUT/tour.json" "$OUT/short.json" > "$RUNNER_TEMP/comment.md"
           id=$(gh api --paginate "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
             --jq '.[] | select(.body | startswith("<!-- pr-docent:tour -->")) | .id' | head -n 1)
           if [ -n "$id" ]; then

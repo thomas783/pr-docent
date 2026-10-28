@@ -2,8 +2,8 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, fetchCommentTour, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
-import { generateLocally, makeShort, revealFile } from "./generate.js";
+import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
@@ -23,8 +23,9 @@ export class TourPanel {
     this.narrationToken = 0;
     this.status = "";
     this.generating = null; // progress text while the local generator runs
-    this.shorting = null; // progress text while a short is rendered
-    this.shortPath = null; // the last video made for this PR
+    this.shorting = null; // progress text while a short is written or saved as a video
+    this.short = null; // this PR's short script: made here, or posted with the tour
+    this.videoPath = null; // the last MP4 saved from it
     this.menuOpen = false;
     this.summaryOpen = false;
     this.chaptersOpen = false;
@@ -55,6 +56,18 @@ export class TourPanel {
 
   errorText(error) {
     return error.i18n ? this.t(...error.i18n) : error.message;
+  }
+
+  /**
+   * False, with a note to reload, when the extension was reloaded after this page opened: the
+   * page keeps this script, but every chrome.* call fails with "Extension context invalidated".
+   */
+  connected() {
+    if (chrome.runtime?.id) return true;
+    this.menuOpen = false;
+    this.status = this.t("reloadPage");
+    this.render();
+    return false;
   }
 
   handleShortcut(event) {
@@ -95,16 +108,17 @@ export class TourPanel {
   /* ---------------- loading ---------------- */
 
   async load() {
-    // After the extension is reloaded, pages opened before it keep this script but lose chrome.*.
     if (!chrome.runtime?.id) {
-      this.status = this.t("reloadPage");
+      this.status = this.t("reloadPage"); // see connected()
       return;
     }
     this.settings = { ...this.settings, ...(await storageGet(SETTINGS_KEY)) };
-    this.shortPath = (await storageGet(`prdocent:short:${this.key}`)) ?? null;
+    this.videoPath = (await storageGet(`prdocent:video:${this.key}`)) ?? null;
     const stored = await storageGet(`prdocent:tour:${this.key}`);
-    // A tour loaded by hand wins, then one the generate-tour workflow posted, then a bundled example.
-    const raw = stored ?? (await fetchCommentTour(this.pr)) ?? (await fetchBundledTour(this.pr));
+    const posted = await fetchCommentData(this.pr);
+    // What was made or loaded here wins, then what the generate-tour workflow posted, then a bundled example.
+    this.short = (await storageGet(`prdocent:shortscript:${this.key}`)) ?? posted.short;
+    const raw = stored ?? posted.tour ?? (await fetchBundledTour(this.pr));
     if (!raw) return;
     const { tour, errors } = parseTour(raw);
     if (errors.length) {
@@ -127,7 +141,7 @@ export class TourPanel {
 
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
   async generate() {
-    if (this.generating) return;
+    if (this.generating || !this.connected()) return;
     this.menuOpen = false;
     this.generating = this.t("readingPr");
     this.status = "";
@@ -153,26 +167,45 @@ export class TourPanel {
     }
   }
 
-  /** Has the local host turn this tour into a short video (MP4 in Downloads). */
+  /** Has the user's local Claude Code write a short script from this tour, then plays it. */
   async makeShort() {
-    if (this.shorting || this.generating || !this.player) return;
+    if (this.shorting || this.generating || !this.player || !this.connected()) return;
     this.menuOpen = false;
     this.shorting = this.t("readingPr");
-    this.shortPath = null;
     this.status = "";
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
       const language = tourLanguage(this.player.tour) === "ko" ? "한국어" : "English";
-      this.shortPath = await makeShort({ pr: this.pr, ...details, tour: this.player.tour, language }, (progress) => {
-        this.shorting = progress.stage === "fetch"
-          ? this.t("fetchingFiles")
-          : progress.stage === "render"
-            ? this.t("shortRender", progress.detail ?? "")
-            : this.t("shortScript", progress.seconds ?? 0);
+      this.short = await writeShortScript({ pr: this.pr, ...details, tour: this.player.tour, language }, (progress) => {
+        this.shorting = progress.stage === "fetch" ? this.t("fetchingFiles") : this.t("shortScript", progress.seconds ?? 0);
         this.render();
       });
-      await storageSet(`prdocent:short:${this.key}`, this.shortPath);
+      await storageSet(`prdocent:shortscript:${this.key}`, this.short);
+      this.shorting = null;
+      this.render();
+      this.playShort();
+    } catch (error) {
+      this.shorting = null;
+      this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
+      this.render();
+    }
+  }
+
+  /** Saves the short as an MP4 in Downloads with the local host (macOS), for sharing as a file. */
+  async saveVideo() {
+    if (this.shorting || !this.short || !this.connected()) return;
+    this.menuOpen = false;
+    this.shorting = this.t("shortRender", "");
+    this.status = "";
+    this.render();
+    try {
+      this.videoPath = await saveShortVideo(this.short, (progress) => {
+        this.shorting = this.t("shortRender", progress.detail ?? "");
+        this.render();
+      });
+      await storageSet(`prdocent:video:${this.key}`, this.videoPath);
+      this.status = this.t("videoSaved", this.videoPath.split("/").pop());
     } catch (error) {
       this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
     }
@@ -180,12 +213,14 @@ export class TourPanel {
     this.render();
   }
 
-  /** Plays a finished short over the page in the extension's own player page. */
-  playVideo(path) {
+  /** Plays the short live over the page, in the extension's own player page. */
+  async playShort() {
+    if (!this.short || !this.connected()) return;
+    await storageSet("prdocent:play", this.short);
     this.root.querySelector(".video-overlay")?.remove();
     const overlay = document.createElement("div");
     overlay.className = "video-overlay";
-    overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL(`player.html?path=${encodeURIComponent(path)}`))}"></iframe>
+    overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL("player.html?short=prdocent:play"))}"></iframe>
       <button class="video-close" aria-label="${esc(this.t("close"))}">✕</button></div>`;
     const close = () => overlay.remove();
     overlay.addEventListener("click", (event) => event.target === overlay && close());
@@ -334,8 +369,9 @@ export class TourPanel {
     const item = (action, label) => `<button class="item" data-action="${action}" ${this.generating || this.shorting ? "disabled" : ""}>${esc(label)}</button>`;
     return `<div class="menu">
       ${item("generate", this.t("regenerate"))}
-      ${item("short", this.t("makeShort"))}
-      ${this.shortPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
+      ${item("short", this.t(this.short ? "remakeShort" : "makeShort"))}
+      ${this.short ? item("video", this.t("saveVideo")) : ""}
+      ${this.videoPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
       ${this.fileInput("item")}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
@@ -346,7 +382,7 @@ export class TourPanel {
   activity() {
     const busy = this.generating ?? this.shorting;
     if (busy) return `<p class="activity">⏳ ${esc(busy)}</p>`;
-    if (this.shortPath) return `<p class="activity"><button class="link" data-action="play">${esc(this.t("playShort"))}</button></p>`;
+    if (this.short) return `<p class="activity"><button class="link" data-action="play">${esc(this.t("watchShort"))}</button></p>`;
     return "";
   }
 
@@ -375,8 +411,9 @@ export class TourPanel {
     on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
     on("short", "click", () => this.makeShort());
-    on("reveal", "click", () => this.shortPath && revealFile(this.shortPath).catch(() => {}));
-    on("play", "click", () => this.shortPath && this.playVideo(this.shortPath));
+    on("video", "click", () => this.saveVideo());
+    on("reveal", "click", () => this.videoPath && revealFile(this.videoPath).catch(() => {}));
+    on("play", "click", () => this.playShort());
     if (!this.player) return;
     on("menu", "click", () => { this.menuOpen = !this.menuOpen; this.render(); });
     on("summary", "click", () => { this.summaryOpen = !this.summaryOpen; this.render(); });
