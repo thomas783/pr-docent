@@ -16,7 +16,7 @@ describe("renderComment", () => {
     const en = renderComment(tour("Lock out repeated logins", "Counts failures per user."));
     assert.match(en, /## 🎧 PR Docent review tour: Lock out repeated logins/);
     assert.match(en, /Made for commit `aaaaaaa`\./);
-    assert.match(en, /### Chapters\n- \*\*1\*\* \(1 steps\)/);
+    assert.match(en, /### Chapters\n- \*\*1\*\* \(1 step\)/);
     assert.doesNotMatch(en, /[가-힣]/);
     const ko = renderComment(tour("로그인 잠금", "사용자별 실패 횟수를 셉니다."));
     assert.match(ko, /## 🎧 PR Docent 리뷰 투어: 로그인 잠금/);
