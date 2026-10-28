@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif; word-break: keep-all; }
+  .shot { width: 1280px; height: 800px; overflow: hidden; position: relative; color: #f0f6fc;
+    background: radial-gradient(1200px 600px at 85% -10%, #3b2470 0%, transparent 60%), linear-gradient(160deg, #161b22, #0d1117 60%, #1f1235); }
+  .wide header { padding: 44px 64px 0; }
+  h1 { font-size: 40px; line-height: 1.2; font-weight: 800; letter-spacing: -.01em; }
+  p { margin-top: 10px; font-size: 20px; line-height: 1.45; color: #b1bac4; }
+  .wide img { position: absolute; left: 64px; right: 64px; bottom: -40px; width: 1152px; border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+  .side { display: flex; align-items: center; gap: 56px; padding: 0 80px; }
+  .side header { flex: 1; }
+  .side img { height: 720px; border-radius: 24px; box-shadow: 0 24px 64px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.1); }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; font-size: 18px; font-weight: 700; color: #c4b5fd; }
+  .brand img { height: 32px !important; width: 32px; border-radius: 0 !important; box-shadow: none !important; position: static !important; }
+  .promo { width: 440px; height: 280px; display: flex; flex-direction: column; justify-content: center; padding: 0 36px; color: #fff;
+    background: radial-gradient(400px 260px at 100% 0%, #9a6cf0 0%, transparent 70%), linear-gradient(150deg, #6639ba, #2a1650); }
+  .promo .row { display: flex; align-items: center; gap: 14px; }
+  .promo .row img { width: 64px; height: 64px; }
+  .promo b { font-size: 34px; font-weight: 800; }
+  .promo p { color: #e9e3ff; font-size: 17px; margin-top: 16px; }
+</style></head><body><div id="root"></div><script>
+  const q = new URLSearchParams(location.search);
+  const icon = "http://localhost:8765/icons/icon-128.png";
+  const brand = `<div class="brand"><img src="${icon}">PR Docent</div>`;
+  const root = document.getElementById("root");
+  if (q.get("layout") === "promo") {
+    root.innerHTML = `<div class="promo" id="out"><div class="row"><img src="http://localhost:8765/store/icon.svg"><b>PR Docent</b></div><p>${q.get("text")}</p></div>`;
+  } else if (q.get("layout") === "side") {
+    root.innerHTML = `<div class="shot side" id="out"><header>${brand}<h1>${q.get("title")}</h1><p>${q.get("text")}</p></header><img src="${q.get("img")}"></div>`;
+  } else {
+    root.innerHTML = `<div class="shot wide" id="out"><header><h1>${q.get("title")}</h1><p>${q.get("text")}</p></header><img src="${q.get("img")}"></div>`;
+  }
+</script></body></html>
