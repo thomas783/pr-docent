@@ -152,17 +152,6 @@ export class TourPanel {
     this.start(tour, (await storageGet(`prdocent:pos:${this.key}`)) ?? 0);
   }
 
-  async loadFromFile(file) {
-    let raw;
-    try {
-      raw = JSON.parse(await file.text());
-    } catch {
-      this.status = this.t("notJson");
-      return this.render();
-    }
-    await this.useTour(raw);
-  }
-
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
   async generate() {
     if (this.generating || !this.connected()) return;
@@ -352,7 +341,6 @@ export class TourPanel {
         <div class="content">
           <p class="muted">${esc(this.t("noTour"))}</p>
           ${this.generateButton()}
-          ${this.fileInput()}
           ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
         </div>`;
       return this.bind();
@@ -410,7 +398,6 @@ export class TourPanel {
       ${item("short", this.t(this.short ? "remakeShort" : "makeShort"))}
       ${this.short ? item("video", this.t("saveVideo")) : ""}
       ${this.videoPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
-      ${this.fileInput("item")}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
     </div>`;
@@ -466,9 +453,6 @@ export class TourPanel {
     return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
-  fileInput(cls = "file-input") {
-    return `<label class="${cls}">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
-  }
 
   bind() {
     const on = (action, event, handler) =>
@@ -482,7 +466,6 @@ export class TourPanel {
       event.preventDefault();
       tab.click();
     });
-    on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
     on("short", "click", () => this.makeShort());
     on("video", "click", () => this.saveVideo());
@@ -677,6 +660,4 @@ const STYLES = `
   .video-box iframe { width: 100%; height: 100%; border: 0; }
   .video-close { display: flex; align-items: center; justify-content: center; position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
-  .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
-    border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;
