@@ -390,6 +390,7 @@ export class TourPanel {
         ${icon("next", "▶", this.t("next"), this.player.isLast)}
         ${icon("nextFocus", "⏭", this.t("nextFocus"), this.player.findFocus(1) < 0)}
         <span class="spacer"></span>
+        ${this.short ? icon("play", "🎬", this.t("watchShort")) : ""}
         ${icon("voice", this.settings.voice ? "🔊" : "🔇", this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
         <select data-action="rate" aria-label="${esc(this.t("narration"))}">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
       </div>
@@ -413,12 +414,10 @@ export class TourPanel {
     </div>`;
   }
 
-  /** What the local host is doing, or the last short ready to play. */
+  /** What the local helper is doing, if anything. */
   activity() {
     const busy = this.generating ?? this.shorting;
-    if (busy) return `<p class="activity">⏳ ${esc(busy)}</p>`;
-    if (this.short) return `<p class="activity"><button class="link" data-action="play">${esc(this.t("watchShort"))}</button></p>`;
-    return "";
+    return busy ? `<p class="activity">⏳ ${esc(busy)}</p>` : "";
   }
 
   header() {
@@ -639,7 +638,6 @@ const STYLES = `
   .video-box iframe { width: 100%; height: 100%; border: 0; }
   .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
-  .link { border: 0; background: none; padding: 0; color: var(--fgColor-accent, #0969da); cursor: pointer; text-decoration: underline; font-size: 12px; }
   .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;
