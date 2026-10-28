@@ -285,6 +285,9 @@ export class TourPanel {
 
   async onPlayerChange(reason) {
     if (reason === "step") {
+      // Stop reading the step being left now, not once the page has scrolled to the next one.
+      this.narrationToken++;
+      stopSpeaking();
       storageSet(`prdocent:pos:${this.key}`, this.player.index);
       await this.focusCurrent();
     }
