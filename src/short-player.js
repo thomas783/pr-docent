@@ -48,7 +48,7 @@ export async function playShort(root, key) {
   let playing = false;
   const length = (i) => scenes[i].narration.length;
   const draw = (i, shown) => {
-    frame.innerHTML = sceneMarkup(scenes[i], { short, shown, index: i, total: scenes.length });
+    frame.innerHTML = sceneMarkup(scenes[i], { short, shown });
   };
   const paint = () =>
     fills.forEach((fill, i) => {
