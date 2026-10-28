@@ -25,6 +25,7 @@ export function renderComment(raw, shortRaw = null) {
     "",
     tour.summary,
     "",
+    ...(tour.pr.head ? [`커밋 \`${tour.pr.head.slice(0, 7)}\` 기준으로 만든 투어입니다.`, ""] : []),
     `Files changed 탭에서 **▶ PR Docent**를 누르면 이 투어가 재생됩니다. (${tour.chapters.length}개 챕터, ${steps.length}단계)`,
     "",
     "### 챕터",
