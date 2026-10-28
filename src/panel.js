@@ -121,6 +121,7 @@ export class TourPanel {
   }
 
   destroy() {
+    this.destroyed = true;
     document.removeEventListener("keydown", this.onKeyDown, true);
     chrome.storage?.onChanged.removeListener(this.onStorageChange);
     this.stop();
@@ -301,6 +302,8 @@ export class TourPanel {
 
   /** Points at the current step on the page. [openViewed] opens its file even if marked as Viewed. */
   async focusCurrent({ openViewed = false } = {}) {
+    // A generation can finish after the user moved to another PR; leave that page alone.
+    if (this.destroyed) return;
     const result = await focusStep(this.player.current, { openViewed });
     this.focusResult = result.found;
     this.status = result.found === "viewed" ? "" : result.found === "none"
