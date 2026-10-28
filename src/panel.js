@@ -5,6 +5,7 @@
 import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
+import { svg } from "./icons.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
 import { speak, speechAvailable, spokenIndex, stopSpeaking } from "./speech.js";
@@ -13,24 +14,6 @@ import { narrationUnits, parseTour, tourFileName, tourLanguage, uncoveredFiles }
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
 const SPEECH_LOCALES = { ko: "ko-KR", en: "en-US" };
-
-// Line icons on a 24px grid, drawn in the button's text color.
-const ICONS = {
-  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
-  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
-  prev: '<path d="m15 18-6-6 6-6"/>',
-  next: '<path d="m9 18 6-6-6-6"/>',
-  skipBack: '<path d="M19 20 9 12l10-8v16Z"/><path d="M5 19V5"/>',
-  skipForward: '<path d="m5 4 10 8-10 8V4Z"/><path d="M19 5v14"/>',
-  video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
-  volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
-  mute: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
-  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-  down: '<path d="m6 9 6 6 6-6"/>',
-  up: '<path d="m18 15-6-6-6 6"/>',
-};
-const svg = (name, size = 16) =>
-  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
 export class TourPanel {
   constructor(pr) {
@@ -167,17 +150,6 @@ export class TourPanel {
       return;
     }
     this.start(tour, (await storageGet(`prdocent:pos:${this.key}`)) ?? 0);
-  }
-
-  async loadFromFile(file) {
-    let raw;
-    try {
-      raw = JSON.parse(await file.text());
-    } catch {
-      this.status = this.t("notJson");
-      return this.render();
-    }
-    await this.useTour(raw);
   }
 
   /** Has the user's local Claude Code write a tour for this PR, then plays it. */
@@ -369,7 +341,6 @@ export class TourPanel {
         <div class="content">
           <p class="muted">${esc(this.t("noTour"))}</p>
           ${this.generateButton()}
-          ${this.fileInput()}
           ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
         </div>`;
       return this.bind();
@@ -427,7 +398,6 @@ export class TourPanel {
       ${item("short", this.t(this.short ? "remakeShort" : "makeShort"))}
       ${this.short ? item("video", this.t("saveVideo")) : ""}
       ${this.videoPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
-      ${this.fileInput("item")}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
     </div>`;
@@ -483,9 +453,6 @@ export class TourPanel {
     return `<button class="generate ${variant}" data-action="generate" ${this.generating ? "disabled" : ""}>${esc(this.generating ?? label)}</button>`;
   }
 
-  fileInput(cls = "file-input") {
-    return `<label class="${cls}">${esc(this.t("loadJson"))}<input type="file" accept="application/json,.json" data-action="file" hidden></label>`;
-  }
 
   bind() {
     const on = (action, event, handler) =>
@@ -499,7 +466,6 @@ export class TourPanel {
       event.preventDefault();
       tab.click();
     });
-    on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
     on("short", "click", () => this.makeShort());
     on("video", "click", () => this.saveVideo());
@@ -692,8 +658,6 @@ const STYLES = `
   .video-box { position: relative; height: min(88vh, 960px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
     box-shadow: 0 24px 64px rgba(0,0,0,.5); background: #0d1117; }
   .video-box iframe { width: 100%; height: 100%; border: 0; }
-  .video-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
+  .video-close { display: flex; align-items: center; justify-content: center; position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0;
     background: rgba(0,0,0,.55); color: #fff; font-size: 15px; cursor: pointer; }
-  .file-input { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
-    border: 1px solid var(--borderColor-default, #d1d9e0); }
 `;

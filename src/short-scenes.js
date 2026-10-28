@@ -21,6 +21,17 @@ export function sceneSteps(scene) {
   return scene.kind === "card" ? 1 : revealSteps(scene);
 }
 
+/**
+ * Where to start reading [text] to land near [fraction] of the way through it: the start of the
+ * word there, since speech can only start at a character offset and a cut word sounds broken.
+ */
+export function wordStartAt(text, fraction) {
+  const at = Math.floor(Math.min(Math.max(fraction, 0), 1) * text.length);
+  if (at >= text.length) return 0;
+  const space = text.lastIndexOf(" ", at);
+  return space < 0 ? 0 : space + 1;
+}
+
 const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 /** Classes for the [i]th element when [shown] are visible: hidden until its turn, lit when it arrives. */
@@ -52,16 +63,15 @@ function diagram(scene, shown, changedLabel) {
 }
 
 /** The inside of a .short-frame for [scene] with [shown] of its elements visible. */
-export function sceneMarkup(scene, { short, shown, index, total }) {
+export function sceneMarkup(scene, { short, shown }) {
   const { owner, repo, number } = short.pr;
   const changedLabel = /[가-힣]/.test(JSON.stringify(short)) ? "수정" : "Changed";
   const main = scene.kind === "card"
     ? `<div class="card"><p class="repo">${esc(scene.opening ? `${owner}/${repo} #${number}` : `github.com/${owner}/${repo}/pull/${number}`)}</p><h1>${esc(scene.headline)}</h1></div>`
     : `<h2>${esc(scene.headline)}</h2><div class="stage">${diagram(scene, shown, changedLabel)}</div>`;
-  const dots = Array.from({ length: total }, (_, i) => `<span${i === index ? ' class="on"' : ""}></span>`).join("");
   return `<header>PR Docent <span>· ${esc(`${owner}/${repo} #${number}`)}</span></header>
     <main>${main}</main>
-    <footer><p class="subtitle">${esc(scene.narration)}</p><div class="dots">${dots}</div></footer>`;
+    <footer><p class="subtitle">${esc(scene.narration)}</p></footer>`;
 }
 
 export const SHORT_CSS = `
@@ -114,7 +124,4 @@ export const SHORT_CSS = `
   .short-frame footer { padding: 0 64px 96px; }
   .short-frame .subtitle { background: rgba(13, 17, 23, .86); border: 2px solid #8250df; border-radius: 28px; padding: 30px 40px;
     font-size: 42px; line-height: 1.4; font-weight: 700; text-align: center; }
-  .short-frame .dots { display: flex; justify-content: center; gap: 14px; margin-top: 36px; }
-  .short-frame .dots span { width: 16px; height: 16px; border-radius: 50%; background: #30363d; }
-  .short-frame .dots span.on { background: #a78bfa; }
 `;

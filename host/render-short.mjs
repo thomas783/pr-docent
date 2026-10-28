@@ -39,7 +39,7 @@ export async function renderShort({ short, outPath, workDir, onProgress = () => 
     const frames = [];
     for (let shown = 1; shown <= steps; shown++) {
       const png = `${base}-${shown}.png`;
-      writeFileSync(`${base}.html`, pageHtml(scene, { short, shown, index: i, total: scenes.length }));
+      writeFileSync(`${base}.html`, pageHtml(scene, { short, shown }));
       await run(chrome, [
         "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
         `--user-data-dir=${join(workDir, "chrome-profile")}`, `--window-size=${WIDTH},${HEIGHT}`,

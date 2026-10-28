@@ -139,11 +139,10 @@ The file is read from the pull request's head commit, so a pull request that cha
 
 ## Loading tours
 
-- A tour posted in the pull request's comments is loaded automatically. A tour you loaded or generated yourself takes precedence.
+- A tour posted in the pull request's comments is loaded automatically. A tour you generated locally takes precedence.
 - A file named `tours/<owner>--<repo>--<number>.json` is loaded for that pull request.
 - Example: [`tours/thomas783--pr-docent--1.json`](tours/thomas783--pr-docent--1.json) tours this repository's [PR #1](https://github.com/thomas783/pr-docent/pull/1/changes) (keyboard shortcuts and skipping between focus steps). With the extension installed, open that pull request to review PR Docent's own change with PR Docent.
 - Tours you put in that folder are loaded automatically and are not committed (see `.gitignore`); only public examples are committed.
-- For any other pull request, choose a file with **Load tour JSON** in the panel. The loaded tour is saved for that pull request.
 
 ## Tour format (version 1)
 
