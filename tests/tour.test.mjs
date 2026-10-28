@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { findTourInBlocks, flattenSteps, narrationUnits, tourLanguage, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
+import { findTourInBlocks, flattenSteps, narrationUnits, pickTour, tourFreshness, tourLanguage, parseTour, readingSeconds, splitSentences, tourFileName, uncoveredFiles } from "../src/tour.js";
 
 const valid = {
   version: 1,
@@ -130,5 +130,31 @@ describe("helpers", () => {
   });
   it("names bundled tour files", () => {
     assert.equal(tourFileName({ owner: "your-org", repo: "your-repo", number: 42 }), "your-org--your-repo--42.json");
+  });
+});
+
+describe("tour revision", () => {
+  const head = "a".repeat(40), base = "b".repeat(40), newer = "c".repeat(40), otherBase = "d".repeat(40);
+  it("keeps the recorded commits and drops malformed ones", () => {
+    assert.deepEqual(parseTour({ ...valid, pr: { ...valid.pr, head, base } }).tour.pr, { owner: "o", repo: "r", number: 7, head, base });
+    assert.deepEqual(parseTour({ ...valid, pr: { ...valid.pr, head: "abc", base } }).tour.pr, { owner: "o", repo: "r", number: 7 });
+  });
+  it("tells how the PR moved since the tour", () => {
+    const tour = { head, base };
+    assert.equal(tourFreshness(tour, { head, base, commits: [head] }), "current");
+    assert.equal(tourFreshness(tour, { head: newer, base, commits: [head, newer] }), "added");
+    assert.equal(tourFreshness(tour, { head: newer, base, commits: [newer] }), "rewritten");
+    assert.equal(tourFreshness(tour, { head, base: otherBase, commits: [head] }), "base");
+    assert.equal(tourFreshness({}, { head, base }), "unknown");
+    assert.equal(tourFreshness(tour, null), "unknown");
+  });
+  it("plays a current tour over a stale one, and the local one otherwise", () => {
+    const current = { head: newer, base, commits: [head, newer] };
+    const stale = { pr: { head, base } }, fresh = { pr: { head: newer, base } };
+    assert.equal(pickTour(stale, fresh, current), fresh);
+    assert.equal(pickTour(fresh, stale, current), fresh);
+    assert.equal(pickTour(stale, stale, current), stale);
+    assert.equal(pickTour(null, stale, current), stale);
+    assert.equal(pickTour(stale, null, null), stale);
   });
 });

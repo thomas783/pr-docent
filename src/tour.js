@@ -17,6 +17,36 @@
 
 export const LEVELS = ["focus", "skim", "skip"];
 
+const SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * The commits a tour was made for, when its generator recorded them: the PR's head commit and the
+ * diff's base (the merge base with the target branch). Written by the tools, never by Claude.
+ */
+function revisionOf(pr) {
+  return SHA.test(pr.head ?? "") ? { head: pr.head, ...(SHA.test(pr.base ?? "") ? { base: pr.base } : {}) } : {};
+}
+
+/**
+ * Whether a tour still matches the PR, given the PR's current { head, base, commits }:
+ * "current"; "added" (new commits on top); "rewritten" (force push, rebase, fixup: the tour's
+ * head is gone from the PR's commits); "base" (same commits against a different base, such as a
+ * retargeted PR); "unknown" (the tour doesn't say, or the PR couldn't be read).
+ * Commit ids cover all history below them, so an unchanged head means unchanged commits.
+ */
+export function tourFreshness(tourPr, current) {
+  if (!tourPr?.head || !current?.head) return "unknown";
+  if (tourPr.head !== current.head) return current.commits?.includes(tourPr.head) ? "added" : "rewritten";
+  return tourPr.base && current.base && tourPr.base !== current.base ? "base" : "current";
+}
+
+/** Of the tour made here and the one posted in the comments, the one to play: a current one first, then the local one. */
+export function pickTour(local, posted, current) {
+  const fresh = (raw) => raw && tourFreshness(raw.pr, current) === "current";
+  if (fresh(local) || !fresh(posted)) return local ?? posted;
+  return posted;
+}
+
 /** Validates and normalizes raw JSON. Returns { tour, errors }; tour is null when there are errors. */
 export function parseTour(raw) {
   const errors = [];
@@ -52,7 +82,7 @@ export function parseTour(raw) {
   return {
     tour: {
       version: 1,
-      pr: { owner: pr.owner, repo: pr.repo, number: pr.number },
+      pr: { owner: pr.owner, repo: pr.repo, number: pr.number, ...revisionOf(pr) },
       title: String(raw.title ?? ""),
       summary: String(raw.summary ?? ""),
       chapters,
