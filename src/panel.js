@@ -96,6 +96,21 @@ export class TourPanel {
     }
   }
 
+  /**
+   * The user moved between this PR's tabs. Highlights only make sense on Files changed (the
+   * Conversation tab has diff snippets too, which they would dim), so drop them elsewhere and
+   * put the current step back on return.
+   */
+  async tabChanged(onDiff) {
+    if (!onDiff) {
+      this.stop();
+      clearHighlight();
+    } else if (!this.panel.hidden && this.player) {
+      await this.focusCurrent();
+    }
+    this.render();
+  }
+
   destroy() {
     document.removeEventListener("keydown", this.onKeyDown, true);
     chrome.storage?.onChanged.removeListener(this.onStorageChange);

@@ -21,7 +21,7 @@ const READING_LINE = 0.25;
 // Spotlight: every other diff cell fades so only the step's lines stand out. The step's rows
 // win because their selector is more specific (the :has() argument counts). The step is framed
 // rather than tinted, so GitHub's own green and red for added and removed lines stay visible.
-const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.45; transition: opacity 0.3s; }`;
+const DIM_STYLE = `[id^="diff-"] tr > td { opacity: 0.6; transition: opacity 0.3s; }`;
 const STEP_FRAME = { width: 2, color: "rgba(130, 80, 223, 0.7)" };
 // Emphasis: the lines the narration is talking about right now get a heavier frame.
 const EMPHASIS_FRAME = { width: 4, color: "#a371f7" };
@@ -188,7 +188,7 @@ export async function emphasize(step, lines) {
   const stepRows = rowsBetween(stepPresent);
   const shown = rowsBetween(present);
   // "html" makes these rules more specific than the step highlight, whatever the style order.
-  setStyle(EMPHASIS_STYLE_ID, `${stepRows.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 0.7; }
+  setStyle(EMPHASIS_STYLE_ID, `${stepRows.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 0.8; }
     ${shown.map((sel) => `html ${sel} > td`).join(",\n")} { opacity: 1; }
     ${frameCss(shown, EMPHASIS_FRAME, "html ")}`);
   const top = present[0].getBoundingClientRect().top;
