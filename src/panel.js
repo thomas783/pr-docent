@@ -351,6 +351,7 @@ export class TourPanel {
   /* ---------------- rendering ---------------- */
 
   render() {
+    this.hideTip?.();
     if (this.panel.hidden) return;
     // Re-rendering replaces the markup; keep the reader's place in the scrolling middle part.
     const scrolled = this.panel.querySelector(".content")?.scrollTop ?? 0;
@@ -443,6 +444,9 @@ export class TourPanel {
       clearTimeout(timer);
       tip.hidden = true;
     };
+    // A re-render replaces the hovered element without a pointer event, which would leave its
+    // old text showing; the next pointer move shows the new one.
+    this.hideTip = hide;
     this.panel.addEventListener("pointerover", (event) => {
       const target = event.target.closest("[data-tip]");
       if (!target) return hide();
