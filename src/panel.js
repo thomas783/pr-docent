@@ -47,6 +47,12 @@ export class TourPanel {
     };
     chrome.storage?.onChanged.addListener(this.onStorageChange);
     document.body.append(this.host);
+    // Reopen after a full page load (a reload, or a link GitHub didn't route) if it was open.
+    if (sessionGet(this.openKey)) this.toggleOpen();
+  }
+
+  get openKey() {
+    return `prdocent:open:${this.key}`;
   }
 
   /** Interface text in the language picked in the popup (or the browser's). */
@@ -82,6 +88,7 @@ export class TourPanel {
   async toggleOpen() {
     const opening = this.panel.hidden;
     this.panel.hidden = !opening;
+    sessionSet(this.openKey, opening);
     this.launcher.classList.toggle("active", opening);
     reservePageSpace(opening);
     if (!opening) {
@@ -404,7 +411,7 @@ export class TourPanel {
   header() {
     const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
     const { owner, repo, number } = this.pr;
-    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes">Files changed</a>`;
+    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
     return `<header><strong>PR Docent</strong><span>
         ${this.player ? `<button class="close" data-action="menu" aria-label="${esc(this.t("more"))}" title="${esc(this.t("more"))}">⋯</button>` : ""}
         <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></span></header>
@@ -423,6 +430,14 @@ export class TourPanel {
     const on = (action, event, handler) =>
       this.panel.querySelectorAll(`[data-action="${action}"]`).forEach((el) => el.addEventListener(event, handler));
     on("close", "click", () => this.toggleOpen());
+    on("changes", "click", (event) => {
+      // A link inside the panel's shadow root misses GitHub's in-page navigation and reloads the
+      // page; click GitHub's own tab instead when it's there.
+      const tab = document.querySelector(`a[href$="/pull/${this.pr.number}/changes"], a[href$="/pull/${this.pr.number}/files"]`);
+      if (!tab) return;
+      event.preventDefault();
+      tab.click();
+    });
     on("file", "change", (e) => e.target.files[0] && this.loadFromFile(e.target.files[0]));
     on("generate", "click", () => this.generate());
     on("short", "click", () => this.makeShort());
@@ -479,6 +494,24 @@ async function fetchBundledTour(pr) {
     return response.ok ? await response.json() : null;
   } catch {
     return null;
+  }
+}
+
+/** Per-tab memory that survives reloads (whether the panel was open), never throwing. */
+function sessionGet(key) {
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function sessionSet(key, on) {
+  try {
+    if (on) sessionStorage.setItem(key, "1");
+    else sessionStorage.removeItem(key);
+  } catch {
+    // storage blocked: the panel just starts closed
   }
 }
 
