@@ -38,6 +38,8 @@ export class TourPanel {
     this.panel = this.root.querySelector(".panel");
     this.showTips();
     this.unitIndex = 0;
+    // Files marked as Viewed that the reviewer chose to open anyway.
+    this.openedViewed = new Set();
     this.launcher.addEventListener("click", () => this.toggleOpen());
     this.onKeyDown = (event) => this.handleShortcut(event);
     document.addEventListener("keydown", this.onKeyDown, true);
@@ -269,6 +271,11 @@ export class TourPanel {
 
   /* ---------------- playback ---------------- */
 
+  /** The current step is in a file marked as Viewed: ask before opening and reading it. */
+  get askingViewed() {
+    return this.focusResult === "viewed";
+  }
+
   async onPlayerChange(reason) {
     if (reason === "step") {
       storageSet(`prdocent:pos:${this.key}`, this.player.index);
@@ -279,12 +286,13 @@ export class TourPanel {
       stopSpeaking();
     }
     this.render();
-    if (this.player.playing && (reason === "step" || reason === "play")) this.narrate();
+    if (this.player.playing && (reason === "step" || reason === "play") && !this.askingViewed) this.narrate();
   }
 
   async focusCurrent() {
-    const result = await focusStep(this.player.current);
-    this.status = result.found === "none"
+    const result = await focusStep(this.player.current, { openViewed: this.openedViewed.has(this.player.current.file) });
+    this.focusResult = result.found;
+    this.status = result.found === "viewed" ? "" : result.found === "none"
       ? this.t("fileNotOnPage")
       : result.found === "file" && this.player.current.lines
         ? this.t("linesNotFound")
@@ -367,6 +375,9 @@ export class TourPanel {
         <p class="chapter">${esc(step.chapterTitle)}</p>
         <p class="file" data-tip="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}
           <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span></p>
+        ${this.askingViewed ? `<div class="ask"><p>${esc(this.t("viewedAsk"))}</p>
+          <button data-action="openViewed">${esc(this.t("viewedOpen"))}</button>
+          <button data-action="skipViewed" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("viewedSkip"))}</button></div>` : ""}
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
@@ -436,6 +447,19 @@ export class TourPanel {
     this.panel.addEventListener("click", hide);
   }
 
+  /** Opens the Viewed file of the current step (and later steps in it) and reads the step. */
+  async openViewed() {
+    this.openedViewed.add(this.player.current.file);
+    await this.focusCurrent();
+    this.render();
+    if (this.player.playing) this.narrate();
+  }
+
+  skipViewed() {
+    if (this.player.isLast) return;
+    this.player.next();
+  }
+
   /** What the local helper is doing, if anything. */
   activity() {
     const busy = this.generating ?? this.shorting;
@@ -443,13 +467,13 @@ export class TourPanel {
   }
 
   header() {
-    const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
+    const { onDiff, onCommits } = parsePullRequestPath(location.pathname) ?? {};
     const { owner, repo, number } = this.pr;
-    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
+    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">${esc(onCommits ? this.t("allChanges") : "Files changed")}</a>`;
     return `<header><strong>PR Docent</strong><span>
         ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${svg(this.menuOpen ? "up" : "down", 12)}</button>` : ""}
         <button class="close" data-action="close" data-tip="${esc(this.t("close"))}" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
-      ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
+      ${onDiff ? "" : `<p class="status">${esc(this.t(onCommits ? "onlyAllChanges" : "onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
   generateButton(label = this.t("generate"), variant = "") {
@@ -483,6 +507,8 @@ export class TourPanel {
     on("previousFocus", "click", () => this.player.previousFocus());
     on("nextFocus", "click", () => this.player.nextFocus());
     on("toggle", "click", () => this.player.toggle());
+    on("openViewed", "click", () => this.openViewed());
+    on("skipViewed", "click", () => this.skipViewed());
     on("refocus", "click", () => this.focusCurrent().then(() => this.render()));
     on("voice", "click", () => this.updateSettings({ voice: !this.settings.voice }));
     on("rate", "change", (e) => this.updateSettings({ rate: Number(e.target.value) }));
@@ -601,6 +627,12 @@ const STYLES = `
   p { margin: 4px 0; }
   .muted { color: var(--fgColor-muted, #59636e); }
   .status { color: var(--fgColor-attention, #9a6700); }
+  .ask { margin: 8px 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .ask p { margin: 0 0 6px; }
+  .ask button { margin-right: 6px; padding: 3px 10px; border-radius: 6px; cursor: pointer; color: inherit;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
+  .ask button:first-of-type { background: #8250df; border-color: #8250df; color: #fff; }
+  .ask button:disabled { opacity: .5; cursor: default; }
   a { color: var(--fgColor-accent, #0969da); }
   button, select { font: inherit; }
   .close { display: inline-flex; padding: 2px; border: 0; background: none; cursor: pointer; color: inherit; }
