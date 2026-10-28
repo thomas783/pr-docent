@@ -358,9 +358,6 @@ export class TourPanel {
       <h2 class="title" data-action="summary" title="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
       ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
       ${this.activity()}
-      <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
-      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${this.chaptersOpen ? "▴" : "▾"}</button>
-      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
 
       <section class="step">
         <p class="chapter">${esc(step.chapterTitle)}</p>
@@ -381,6 +378,9 @@ export class TourPanel {
         ${icon("voice", this.settings.voice ? "🔊" : "🔇", this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
         <select data-action="rate" aria-label="${esc(this.t("narration"))}">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
       </div>
+      <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
+      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${this.chaptersOpen ? "▴" : "▾"}</button>
+      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
 
       ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}`;
     this.bind();
@@ -566,7 +566,7 @@ const STYLES = `
   a { color: var(--fgColor-accent, #0969da); }
   button, select { font: inherit; }
   .close { border: 0; background: none; cursor: pointer; color: inherit; font-size: 14px; }
-  .progress { height: 4px; border-radius: 4px; background: var(--bgColor-muted, #eff2f5); overflow: hidden; margin-top: 8px; }
+  .progress { height: 4px; border-radius: 4px; background: var(--bgColor-muted, #eff2f5); overflow: hidden; margin-top: 10px; }
   .progress span { display: block; height: 100%; background: #8250df; }
   .step { margin-top: 10px; padding: 12px; border-radius: 8px; background: var(--bgColor-muted, #f6f8fa); }
   .chapter { font-weight: 600; }
