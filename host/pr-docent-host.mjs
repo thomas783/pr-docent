@@ -12,14 +12,19 @@ import { buildPrompt, checkBrevity, parseGuidelines } from "../src/guidelines.js
 import { parseTour } from "../src/tour.js";
 import { prepareWorkspace, runClaude, stopClaude } from "./claude.mjs";
 import { createDecoder, encodeMessage } from "./native.mjs";
+import { stopRendering } from "./render-short.mjs";
 import { saveShortVideo, writeShortScript } from "./short.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const send = (message) => process.stdout.write(encodeMessage(message));
+// Writing after Chrome closed the pipe fails; there is no one left to tell.
+process.stdout.on("error", () => process.exit(0));
+let busy = false;
 
 process.stdin.on(
   "data",
   createDecoder((message) => {
+    busy = true;
     const reply = (promise, toMessage) =>
       promise
         .then((value) => send(toMessage(value)))
@@ -39,10 +44,14 @@ process.stdin.on(
     }
   }),
 );
-// Chrome closes stdin when the extension disconnects (panel closed, tab gone): stop Claude too.
+// Chrome closes stdin when the extension disconnects (panel closed, tab gone): stop Claude or the
+// render too, and let the request finish failing so its temporary folder is removed, then exit
+// (from the reply above, or after a grace period).
 process.stdin.on("end", () => {
   stopClaude();
-  process.exit(0);
+  stopRendering();
+  if (!busy) process.exit(0);
+  setTimeout(() => process.exit(0), 5000);
 });
 
 /** Shows a saved video in Finder; only files this tool writes (pr-docent-*.mp4). */

@@ -121,6 +121,7 @@ export class TourPanel {
   }
 
   destroy() {
+    this.destroyed = true;
     document.removeEventListener("keydown", this.onKeyDown, true);
     chrome.storage?.onChanged.removeListener(this.onStorageChange);
     this.stop();
@@ -285,6 +286,9 @@ export class TourPanel {
 
   async onPlayerChange(reason) {
     if (reason === "step") {
+      // Stop reading the step being left now, not once the page has scrolled to the next one.
+      this.narrationToken++;
+      stopSpeaking();
       storageSet(`prdocent:pos:${this.key}`, this.player.index);
       await this.focusCurrent();
     }
@@ -298,6 +302,8 @@ export class TourPanel {
 
   /** Points at the current step on the page. [openViewed] opens its file even if marked as Viewed. */
   async focusCurrent({ openViewed = false } = {}) {
+    // A generation can finish after the user moved to another PR; leave that page alone.
+    if (this.destroyed) return;
     const result = await focusStep(this.player.current, { openViewed });
     this.focusResult = result.found;
     this.status = result.found === "viewed" ? "" : result.found === "none"
@@ -345,6 +351,7 @@ export class TourPanel {
   /* ---------------- rendering ---------------- */
 
   render() {
+    this.hideTip?.();
     if (this.panel.hidden) return;
     // Re-rendering replaces the markup; keep the reader's place in the scrolling middle part.
     const scrolled = this.panel.querySelector(".content")?.scrollTop ?? 0;
@@ -437,6 +444,9 @@ export class TourPanel {
       clearTimeout(timer);
       tip.hidden = true;
     };
+    // A re-render replaces the hovered element without a pointer event, which would leave its
+    // old text showing; the next pointer move shows the new one.
+    this.hideTip = hide;
     this.panel.addEventListener("pointerover", (event) => {
       const target = event.target.closest("[data-tip]");
       if (!target) return hide();

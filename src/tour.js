@@ -193,7 +193,12 @@ export function findTourInBlocks(blocks, { owner, repo, number }) {
 
 /** "ko" when the tour's text has Hangul, otherwise "en": the language to narrate it in. */
 export function tourLanguage(tour) {
-  const text = [tour.title, tour.summary, ...flattenSteps(tour).flatMap((s) => [s.note, s.point])].join(" ");
+  const text = [
+    tour.title,
+    tour.summary,
+    ...tour.chapters.flatMap((c) => [c.title, c.summary]),
+    ...flattenSteps(tour).flatMap((s) => [s.note, s.point]),
+  ].join(" ");
   return /[가-힣]/.test(text) ? "ko" : "en";
 }
 
