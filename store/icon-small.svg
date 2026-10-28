@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The 16 and 32 px icon: the play button alone, which still reads at that size. -->
+  <rect x="1" y="1" width="30" height="30" rx="8" fill="#8250df"/>
+  <path d="M12 9.5v13a1.2 1.2 0 0 0 1.8 1l10.4-6.5a1.2 1.2 0 0 0 0-2L13.8 8.5a1.2 1.2 0 0 0-1.8 1Z" fill="#fff"/>
+</svg>

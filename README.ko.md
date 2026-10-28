@@ -39,6 +39,15 @@ GitHub의 diff 화면은 화살표 키와 한 글자 단축키를 이미 쓰므�
 | `Alt` + `↓` / `↑` | 다음 / 이전 **집중** 단계로 건너뛰기 |
 | `Alt` + `P` | 재생 / 일시정지 |
 
+## 바로 체험해 보기
+
+PR Docent를 체험할 수 있는 데모 PR 두 개를 열어 두었습니다. 같은 작은 변경(로그인에 5번 연속 실패하면 이름 잠금)을 언어별로 안내합니다. 확장을 설치한 뒤 PR을 열고 Files changed 탭에서 **PR Docent**를 누르세요.
+
+- English: [#22 Lock out repeated failed logins](https://github.com/thomas783/pr-docent/pull/22/changes)
+- 한국어: [#23 로그인 연속 실패 시 잠금](https://github.com/thomas783/pr-docent/pull/23/changes)
+
+두 PR은 데모 코드가 있는 `demo/base` 브랜치를 대상으로 하며, `main`에는 머지하지 않습니다.
+
 ## 설치 (개발용)
 
 1. `chrome://extensions`에서 **개발자 모드**를 켭니다.
