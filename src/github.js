@@ -102,6 +102,25 @@ async function ensureRendered(fileId) {
   }
 }
 
+/** The accessible name of [button], which GitHub often gives through aria-labelledby. */
+function buttonName(button) {
+  const by = button.getAttribute("aria-labelledby");
+  return (by ? document.getElementById(by)?.textContent : button.getAttribute("aria-label"))?.trim() ?? "";
+}
+
+/** Whether the reviewer marked the file as Viewed, which also collapses it. */
+function isViewed(fileId) {
+  return [...(document.getElementById(fileId)?.querySelectorAll('button[aria-pressed="true"]') ?? [])].some((b) => b.textContent.trim() === "Viewed");
+}
+
+/** Opens a collapsed file (such as a Viewed one) without changing its Viewed mark. */
+async function expandFile(fileId) {
+  const toggle = [...(document.getElementById(fileId)?.querySelectorAll("button") ?? [])].find((b) => buttonName(b) === "Expand file");
+  if (!toggle) return;
+  toggle.click();
+  await waitFor(() => document.getElementById(fileId)?.querySelector("tr.diff-line-row"), 1500);
+}
+
 async function waitFor(condition, timeoutMs) {
   for (let waited = 0; waited < timeoutMs && !condition(); waited += 100) await sleep(100);
 }
@@ -149,13 +168,22 @@ export function rowSelectors(hash, side, [start, end]) {
  * Scrolls to a step and highlights it. Returns what was found, so the panel can say
  * when a file or line isn't on the page (e.g. the tour is for another revision).
  */
-export async function focusStep(step) {
+export async function focusStep(step, { openViewed = false } = {}) {
   const hash = await sha256Hex(step.file);
   const fileId = `diff-${hash}`;
   setStyle(EMPHASIS_STYLE_ID, "");
   if (!document.getElementById(fileId)) {
     setHighlight("");
     return { found: "none" };
+  }
+  // A file the reviewer marked as Viewed: show where it is, and open it only when asked to.
+  if (isViewed(fileId)) {
+    if (!openViewed) {
+      setHighlight(`#${fileId} { ${FILE_STYLE} }`);
+      await scrollToReadingLine(() => document.getElementById(fileId));
+      return { found: "viewed" };
+    }
+    await expandFile(fileId);
   }
 
   if (step.lines) {
