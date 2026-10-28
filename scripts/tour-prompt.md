@@ -24,16 +24,19 @@ change any other file. Use these absolute paths as written and do not change dir
 
 ## Format
 
+Write every text in the tour in {{LANGUAGE}}: the title, the summaries, chapter titles, notes,
+review points and skipped reasons. The example below only shows the shape.
+
 ```json
 {
   "version": 1,
   "pr": { "owner": "...", "repo": "...", "number": 0 },
-  "title": "한 줄 제목",
-  "summary": "PR이 무엇을 왜 바꾸는지 2~4문장",
+  "title": "One-line title",
+  "summary": "What the PR changes and why, in 2-4 sentences",
   "chapters": [
     {
-      "title": "1. 챕터 제목",
-      "summary": "한 문장",
+      "title": "1. Chapter title",
+      "summary": "One sentence",
       "steps": [
         {
           "file": "path/from/repo/root.kt",
@@ -41,15 +44,15 @@ change any other file. Use these absolute paths as written and do not change dir
           "side": "right",
           "level": "focus",
           "note": [
-            { "text": "이 문장이 설명하는 줄을 가리킵니다.", "lines": [41, 45] },
-            { "text": "다음 문장은 다른 줄을 가리킵니다.", "lines": [50, 58] }
+            { "text": "This sentence points at the lines it talks about.", "lines": [41, 45] },
+            { "text": "The next sentence points at other lines.", "lines": [50, 58] }
           ],
-          "point": "리뷰어가 확인할 구체적인 질문"
+          "point": "A specific question for the reviewer to check"
         }
       ]
     }
   ],
-  "skipped": [{ "file": "package-lock.json", "reason": "의존성 잠금 파일" }]
+  "skipped": [{ "file": "package-lock.json", "reason": "dependency lock file" }]
 }
 ```
 
