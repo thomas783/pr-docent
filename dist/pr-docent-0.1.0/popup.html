@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { margin: 0; padding: 14px 16px; width: 260px; font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; color: #1f2328; background: #fff; }
+      h1 { margin: 0 0 10px; font-size: 15px; }
+      label { display: block; font-weight: 600; margin-bottom: 4px; }
+      select { width: 100%; padding: 5px; font: inherit; }
+      p { margin: 12px 0 0; color: #59636e; }
+      @media (prefers-color-scheme: dark) {
+        body { color: #f0f6fc; background: #0d1117; }
+        p { color: #9198a1; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>PR Docent</h1>
+    <label for="language" data-i18n="popupLanguage"></label>
+    <select id="language"></select>
+    <p data-i18n="popupHint"></p>
+    <script type="module" src="src/popup.js"></script>
+  </body>
+</html>

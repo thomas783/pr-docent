@@ -38,8 +38,6 @@ export class TourPanel {
     this.panel = this.root.querySelector(".panel");
     this.showTips();
     this.unitIndex = 0;
-    // Files marked as Viewed that the reviewer chose to open anyway.
-    this.openedViewed = new Set();
     this.launcher.addEventListener("click", () => this.toggleOpen());
     this.onKeyDown = (event) => this.handleShortcut(event);
     document.addEventListener("keydown", this.onKeyDown, true);
@@ -298,8 +296,9 @@ export class TourPanel {
     if (this.player.playing && (reason === "step" || reason === "play") && !this.askingViewed) this.narrate();
   }
 
-  async focusCurrent() {
-    const result = await focusStep(this.player.current, { openViewed: this.openedViewed.has(this.player.current.file) });
+  /** Points at the current step on the page. [openViewed] opens its file even if marked as Viewed. */
+  async focusCurrent({ openViewed = false } = {}) {
+    const result = await focusStep(this.player.current, { openViewed });
     this.focusResult = result.found;
     this.status = result.found === "viewed" ? "" : result.found === "none"
       ? this.t("fileNotOnPage")
@@ -457,10 +456,9 @@ export class TourPanel {
     this.panel.addEventListener("click", hide);
   }
 
-  /** Opens the Viewed file of the current step (and later steps in it) and reads the step. */
+  /** Takes the Viewed mark off the current step's file, opens it and reads the step. */
   async openViewed() {
-    this.openedViewed.add(this.player.current.file);
-    await this.focusCurrent();
+    await this.focusCurrent({ openViewed: true });
     this.render();
     if (this.player.playing) this.narrate();
   }
