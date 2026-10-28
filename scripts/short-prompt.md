@@ -22,25 +22,28 @@ written and do not change directory: `{{OUT}}/short.json` is the only file you m
 
 ## Format
 
+Write every text in the short in {{LANGUAGE}}: the title, hook, headlines, narration, labels,
+items and outro. The example below only shows the shape.
+
 ```json
 {
   "version": 1,
   "pr": { "owner": "...", "repo": "...", "number": 0 },
-  "title": "짧은 제목",
-  "hook": "무엇이 왜 바뀌는지 한 문장",
+  "title": "Short title",
+  "hook": "One sentence on what changes and why",
   "scenes": [
-    { "kind": "compare", "headline": "무엇이 달라지나", "narration": "한 문장",
-      "before": { "label": "이전", "items": ["..."] }, "after": { "label": "이후", "items": ["..."] } },
-    { "kind": "flow", "headline": "어떻게 동작하나", "narration": "한 문장",
-      "steps": [{ "icon": "📝", "label": "짧은 이름", "detail": "한 줄 설명", "status": "same" },
+    { "kind": "compare", "headline": "What changes", "narration": "One sentence",
+      "before": { "label": "Before", "items": ["..."] }, "after": { "label": "After", "items": ["..."] } },
+    { "kind": "flow", "headline": "How it works", "narration": "One sentence",
+      "steps": [{ "icon": "📝", "label": "Short name", "detail": "One-line detail", "status": "same" },
                 { "icon": "🤖", "label": "...", "detail": "...", "status": "new" }],
-      "links": ["화살표 위 설명"] },
-    { "kind": "structure", "headline": "어디에 들어가나", "narration": "한 문장",
-      "groups": [{ "label": "계층이나 모듈", "items": [{ "icon": "📦", "label": "...", "status": "changed" }] }] },
-    { "kind": "points", "headline": "기억할 것", "narration": "한 문장",
-      "points": [{ "icon": "✅", "text": "짧은 요점" }] }
+      "links": ["Label on the arrow"] },
+    { "kind": "structure", "headline": "Where it fits", "narration": "One sentence",
+      "groups": [{ "label": "Layer or module", "items": [{ "icon": "📦", "label": "...", "status": "changed" }] }] },
+    { "kind": "points", "headline": "Remember", "narration": "One sentence",
+      "points": [{ "icon": "✅", "text": "Short point" }] }
   ],
-  "outro": "영향이나 확인할 점 한 문장"
+  "outro": "One sentence on the impact or what to check"
 }
 ```
 
@@ -48,7 +51,7 @@ written and do not change directory: `{{OUT}}/short.json` is the only file you m
 
 - Write in {{LANGUAGE}}. Plain words a non-developer understands: what changes for users, data,
   operations or the team. Name a component only when the picture needs it, and call it by what
-  it does ("투어 검사기", "결제 모듈") rather than by a class or file name.
+  it does ("the tour checker", "the payment module") rather than by a class or file name.
 - 2 to 4 scenes that tell one story, usually: what changes (compare) → how it works (flow or
   structure) → what it means (points). Pick the kinds that fit this PR; do not force all four.
 - Mark what this PR adds as `"status": "new"` and what it modifies as `"changed"`; leave the rest
