@@ -195,6 +195,9 @@ export class TourPanel {
         this.render();
       });
       await storageSet(`prdocent:shortscript:${this.key}`, this.short);
+      // A video file saved earlier is of the old short.
+      this.videoPath = null;
+      await storageSet(`prdocent:video:${this.key}`, null);
       this.shorting = null;
       this.render();
       this.playShort();
