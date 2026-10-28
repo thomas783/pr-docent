@@ -336,13 +336,23 @@ export class TourPanel {
 
   render() {
     if (this.panel.hidden) return;
+    // Re-rendering replaces the markup; keep the reader's place in the scrolling middle part.
+    const scrolled = this.panel.querySelector(".content")?.scrollTop ?? 0;
+    this.draw();
+    const content = this.panel.querySelector(".content");
+    if (content) content.scrollTop = scrolled;
+  }
+
+  draw() {
     if (!this.player) {
       this.panel.innerHTML = `
         ${this.header()}
-        <p class="muted">${esc(this.t("noTour"))}</p>
-        ${this.generateButton()}
-        ${this.fileInput()}
-        ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}`;
+        <div class="content">
+          <p class="muted">${esc(this.t("noTour"))}</p>
+          ${this.generateButton()}
+          ${this.fileInput()}
+          ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
+        </div>`;
       return this.bind();
     }
     const { tour } = this.player;
@@ -355,6 +365,7 @@ export class TourPanel {
     this.panel.innerHTML = `
       ${this.header()}
       ${this.menuOpen ? this.menu(tour) : ""}
+      <div class="content">
       <h2 class="title" data-action="summary" title="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
       ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
       ${this.activity()}
@@ -367,7 +378,11 @@ export class TourPanel {
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
       </section>
+      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
+      ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
+      </div>
 
+      <div class="footer">
       <div class="bar">
         ${icon("previousFocus", "⏮", this.t("previousFocus"), this.player.findFocus(-1) < 0)}
         ${icon("prev", "◀", this.t("previous"), this.player.isFirst)}
@@ -380,9 +395,7 @@ export class TourPanel {
       </div>
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
       <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${this.chaptersOpen ? "▴" : "▾"}</button>
-      ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
-
-      ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}`;
+      </div>`;
     this.bind();
   }
 
@@ -551,13 +564,17 @@ const STYLES = `
   }
   .launcher.active { background: #6639ba; }
   .panel {
-    position: fixed; top: 72px; right: 16px; bottom: 76px; z-index: 2147483000; width: ${PANEL_WIDTH}px; overflow-y: auto;
+    position: fixed; top: 72px; right: 16px; bottom: 76px; z-index: 2147483000; width: ${PANEL_WIDTH}px;
+    display: flex; flex-direction: column; overflow: hidden;
     padding: 14px 16px; border-radius: 12px;
     background: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328);
     border: 1px solid var(--borderColor-default, #d1d9e0); box-shadow: 0 12px 32px rgba(0,0,0,.2);
     font-size: 13px; line-height: 1.5;
   }
   .panel[hidden] { display: none; }
+  /* Header on top, controls pinned at the bottom, everything in between scrolls. */
+  .content { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 0 16px; }
+  .footer { flex: none; padding-top: 8px; border-top: 1px solid var(--borderColor-muted, #d1d9e0b3); }
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   h2 { font-size: 15px; margin: 4px 0 6px; }
   p { margin: 4px 0; }
@@ -594,7 +611,7 @@ const STYLES = `
   .menu .item:hover:not(:disabled) { background: var(--bgColor-neutral-muted, rgba(175, 184, 193, .2)); }
   .menu .item:disabled { opacity: .5; cursor: default; }
   .menu details { margin: 4px 8px; }
-  .bar { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+  .bar { display: flex; align-items: center; gap: 4px; }
   .bar .spacer { flex: 1; }
   .icon { width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer; font-size: 13px;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }
