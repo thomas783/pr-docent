@@ -21,6 +21,17 @@ export function sceneSteps(scene) {
   return scene.kind === "card" ? 1 : revealSteps(scene);
 }
 
+/**
+ * Where to start reading [text] to land near [fraction] of the way through it: the start of the
+ * word there, since speech can only start at a character offset and a cut word sounds broken.
+ */
+export function wordStartAt(text, fraction) {
+  const at = Math.floor(Math.min(Math.max(fraction, 0), 1) * text.length);
+  if (at >= text.length) return 0;
+  const space = text.lastIndexOf(" ", at);
+  return space < 0 ? 0 : space + 1;
+}
+
 const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 /** Classes for the [i]th element when [shown] are visible: hidden until its turn, lit when it arrives. */

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { checkShort, findShortInBlocks, parseShort, revealSteps } from "../src/short.js";
+import { wordStartAt } from "../src/short-scenes.js";
 import { findTourInBlocks } from "../src/tour.js";
 
 const flow = { kind: "flow", headline: "자동 생성", narration: "PR을 올리면 투어가 만들어집니다.", steps: [{ icon: "📝", label: "PR" }, { label: "Claude", status: "new" }], links: ["실행"] };
@@ -72,4 +73,12 @@ describe("finding the tour and the short in one comment", () => {
     assert.equal(findTourInBlocks([shortJson], pr), null);
     assert.equal(findShortInBlocks([tour], pr), null);
   });
+});
+
+describe("wordStartAt", () => {
+  const text = "쇼츠를 바로 재생합니다";
+  it("starts at the beginning for the start of the bar", () => assert.equal(wordStartAt(text, 0), 0));
+  it("moves back to the start of the word under the click", () => assert.equal(wordStartAt(text, 0.45), 4));
+  it("starts at the last word near the end", () => assert.equal(wordStartAt(text, 0.99), 7));
+  it("starts over past the end", () => assert.equal(wordStartAt(text, 1), 0));
 });
