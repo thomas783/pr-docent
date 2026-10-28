@@ -24,6 +24,8 @@ A Chrome extension that acts as a docent for GitHub pull requests: on the **File
 - Expands large diffs that GitHub collapses ("Load Diff").
 - Narrows the page while the panel is open so the diff isn't hidden behind it.
 - Remembers where you were in each pull request.
+- Files you marked as **Viewed** stay closed: at their steps the panel asks whether to open the file or skip it.
+- When you pick a commit or a range of commits on Files changed, the tour doesn't play, since its line numbers are for the whole pull request; the panel links back to all changes.
 - **Shorts:** watch a picture-based explanation of the pull request right in the panel.
 - Interface in English (default) and Korean. Click the PR Docent icon in the toolbar to choose automatic (browser language), English or 한국어. Tours generated locally are written in the chosen language, and narration follows the tour's own language.
 
