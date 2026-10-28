@@ -41,7 +41,7 @@ GitHub's diff view already uses the arrow keys and single letters, so PR Docent 
 
 1. Turn on **Developer mode** in `chrome://extensions`.
 2. Click **Load unpacked** and choose this folder.
-3. Open a pull request's Files changed tab; the **▶ PR Docent** button appears at the bottom right.
+3. Open a pull request's Files changed tab; the **PR Docent** button appears at the bottom right.
 
 ## Generating tours automatically (GitHub Actions)
 
@@ -107,8 +107,8 @@ How it works
 A short explains a pull request in 30-45 seconds **with pictures instead of code**, for teammates who won't read the code, such as planners. It has an opening card, 2-4 picture scenes and a closing card; each scene has a large headline and a picture that builds up while its sentence is read aloud and subtitled.
 
 - Picture kinds: **flow** (what happens in order), **before and after**, **structure** (modules and layers) and **key points**. What the pull request adds is marked NEW in purple and what it changes in yellow.
-- Where it comes from: the GitHub Actions workflow writes one with every tour, or **More → 🎬 Make a short** in the panel writes one with your local Claude Code from the current tour (about a minute).
-- Watching: **🎬 Watch the short** in the panel plays it over the page, live in your browser. Nothing is rendered or saved; only the script (a few KB) is kept with the tour.
+- Where it comes from: the GitHub Actions workflow writes one with every tour, or **More → Make a short** in the panel writes one with your local Claude Code from the current tour (about a minute).
+- Watching: the **video button** (Watch the short) next to the controls plays it over the page, live in your browser. Nothing is rendered or saved; only the script (a few KB) is kept with the tour.
 - Claude Code writes the script from the tour, and `scripts/check-short.mjs` checks that it fits a phone screen (number of scenes, boxes and items; headline, label and sentence lengths).
 
 Saving a short as a video file (optional, macOS)

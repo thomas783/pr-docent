@@ -14,6 +14,24 @@ const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
 const SPEECH_LOCALES = { ko: "ko-KR", en: "en-US" };
 
+// Line icons on a 24px grid, drawn in the button's text color.
+const ICONS = {
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
+  prev: '<path d="m15 18-6-6 6-6"/>',
+  next: '<path d="m9 18 6-6-6-6"/>',
+  skipBack: '<path d="M19 20 9 12l10-8v16Z"/><path d="M5 19V5"/>',
+  skipForward: '<path d="m5 4 10 8-10 8V4Z"/><path d="M19 5v14"/>',
+  video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
+  volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  mute: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+};
+const svg = (name, size = 16) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
 export class TourPanel {
   constructor(pr) {
     this.pr = pr;
@@ -32,7 +50,7 @@ export class TourPanel {
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">▶ PR Docent</button><aside class="panel" hidden></aside>`;
+    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">${svg("play", 12)} PR Docent</button><aside class="panel" hidden></aside>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
     this.unitIndex = 0;
@@ -243,7 +261,7 @@ export class TourPanel {
     const overlay = document.createElement("div");
     overlay.className = "video-overlay";
     overlay.innerHTML = `<div class="video-box"><iframe allow="autoplay; fullscreen" src="${esc(chrome.runtime.getURL("player.html?short=prdocent:play"))}"></iframe>
-      <button class="video-close" aria-label="${esc(this.t("close"))}">✕</button></div>`;
+      <button class="video-close" aria-label="${esc(this.t("close"))}">${svg("close")}</button></div>`;
     const close = () => overlay.remove();
     overlay.addEventListener("click", (event) => event.target === overlay && close());
     overlay.querySelector(".video-close").addEventListener("click", close);
@@ -384,18 +402,18 @@ export class TourPanel {
 
       <div class="footer">
       <div class="bar">
-        ${icon("previousFocus", "⏮", this.t("previousFocus"), this.player.findFocus(-1) < 0)}
-        ${icon("prev", "◀", this.t("previous"), this.player.isFirst)}
-        ${icon("toggle", this.player.playing ? "❚❚" : "▶", this.t(this.player.playing ? "pause" : "play"), false, "primary")}
-        ${icon("next", "▶", this.t("next"), this.player.isLast)}
-        ${icon("nextFocus", "⏭", this.t("nextFocus"), this.player.findFocus(1) < 0)}
+        ${icon("previousFocus", svg("skipBack"), this.t("previousFocus"), this.player.findFocus(-1) < 0)}
+        ${icon("prev", svg("prev", 18), this.t("previous"), this.player.isFirst)}
+        ${icon("toggle", svg(this.player.playing ? "pause" : "play"), this.t(this.player.playing ? "pause" : "play"), false, "primary")}
+        ${icon("next", svg("next", 18), this.t("next"), this.player.isLast)}
+        ${icon("nextFocus", svg("skipForward"), this.t("nextFocus"), this.player.findFocus(1) < 0)}
         <span class="spacer"></span>
-        ${this.short ? icon("play", "🎬", this.t("watchShort")) : ""}
-        ${icon("voice", this.settings.voice ? "🔊" : "🔇", this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
+        ${this.short ? icon("play", svg("video"), this.t("watchShort")) : ""}
+        ${icon("voice", svg(this.settings.voice ? "volume" : "mute"), this.t(this.settings.voice ? "voiceOn" : "voiceOff"), !speechAvailable())}
         <select data-action="rate" aria-label="${esc(this.t("narration"))}">${[0.8, 1, 1.25, 1.5].map((r) => `<option value="${r}" ${r === this.settings.rate ? "selected" : ""}>${r}x</option>`).join("")}</select>
       </div>
       <div class="progress"><span style="width:${((this.player.index + 1) / total) * 100}%"></span></div>
-      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${this.chaptersOpen ? "▴" : "▾"}</button>
+      <button class="where" data-action="chapters">${esc(this.t("whereAt", step.chapterIndex + 1, tour.chapters.length, this.player.index + 1, total))} ${svg(this.chaptersOpen ? "up" : "down", 12)}</button>
       </div>`;
     this.bind();
   }
@@ -417,7 +435,7 @@ export class TourPanel {
   /** What the local helper is doing, if anything. */
   activity() {
     const busy = this.generating ?? this.shorting;
-    return busy ? `<p class="activity">⏳ ${esc(busy)}</p>` : "";
+    return busy ? `<p class="activity"><span class="spinner"></span>${esc(busy)}</p>` : "";
   }
 
   header() {
@@ -425,8 +443,8 @@ export class TourPanel {
     const { owner, repo, number } = this.pr;
     const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
     return `<header><strong>PR Docent</strong><span>
-        ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${this.menuOpen ? "▴" : "▾"}</button>` : ""}
-        <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></span></header>
+        ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${svg(this.menuOpen ? "up" : "down", 12)}</button>` : ""}
+        <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
       ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
@@ -561,6 +579,7 @@ const STYLES = `
     background: #8250df; color: #fff; font-size: 13px; font-weight: 600;
     box-shadow: 0 6px 20px rgba(0,0,0,.25);
   }
+  .launcher { display: inline-flex; align-items: center; gap: 6px; }
   .launcher.active { background: #6639ba; }
   .panel {
     position: fixed; top: 72px; right: 16px; bottom: 76px; z-index: 2147483000; width: ${PANEL_WIDTH}px;
@@ -581,7 +600,8 @@ const STYLES = `
   .status { color: var(--fgColor-attention, #9a6700); }
   a { color: var(--fgColor-accent, #0969da); }
   button, select { font: inherit; }
-  .close { border: 0; background: none; cursor: pointer; color: inherit; font-size: 14px; }
+  .close { display: inline-flex; padding: 2px; border: 0; background: none; cursor: pointer; color: inherit; }
+  svg { flex: none; }
   .progress { height: 4px; border-radius: 4px; background: var(--bgColor-muted, #eff2f5); overflow: hidden; margin-top: 10px; }
   .progress span { display: block; height: 100%; background: #8250df; }
   .step { margin-top: 10px; padding: 12px; border-radius: 8px; background: var(--bgColor-muted, #f6f8fa); }
@@ -597,13 +617,15 @@ const STYLES = `
     background: var(--bgColor-attention-muted, #fff8c5); }
   .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
   header > span { display: flex; gap: 6px; align-items: center; }
-  .menu-toggle { padding: 2px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; color: inherit;
+  .menu-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; color: inherit;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
   .menu-toggle:hover, .menu-toggle.open { background: var(--bgColor-muted, #f6f8fa); border-color: #8250df; }
   .title { cursor: pointer; }
   .summary { color: var(--fgColor-muted, #59636e); }
-  .activity { font-size: 12px; color: var(--fgColor-muted, #59636e); }
-  .where { margin-top: 4px; padding: 0; border: 0; background: none; cursor: pointer; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .activity { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fgColor-muted, #59636e); }
+  .spinner { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .where { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 0; border: 0; background: none; cursor: pointer; font-size: 12px; color: var(--fgColor-muted, #59636e); }
   .menu { display: flex; flex-direction: column; margin: 0 0 10px; padding: 6px; border-radius: 8px;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
   .menu .item { display: block; text-align: left; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; }
@@ -612,7 +634,7 @@ const STYLES = `
   .menu details { margin: 4px 8px; }
   .bar { display: flex; align-items: center; gap: 4px; }
   .bar .spacer { flex: 1; }
-  .icon { width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer; font-size: 13px;
+  .icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); color: inherit; }
   .icon.primary { width: 48px; background: #8250df; border-color: #8250df; color: #fff; }
   .icon:disabled { opacity: .35; cursor: default; }
