@@ -386,7 +386,7 @@ export class TourPanel {
     this.bind();
   }
 
-  /** The ⋯ menu: what people use now and then, out of the way of playback. */
+  /** The "More" menu: what people use now and then, out of the way of playback. */
   menu(tour) {
     const item = (action, label) => `<button class="item" data-action="${action}" ${this.generating || this.shorting ? "disabled" : ""}>${esc(label)}</button>`;
     return `<div class="menu">
@@ -413,7 +413,7 @@ export class TourPanel {
     const { owner, repo, number } = this.pr;
     const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
     return `<header><strong>PR Docent</strong><span>
-        ${this.player ? `<button class="close" data-action="menu" aria-label="${esc(this.t("more"))}" title="${esc(this.t("more"))}">⋯</button>` : ""}
+        ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${this.menuOpen ? "▴" : "▾"}</button>` : ""}
         <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">✕</button></span></header>
       ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
@@ -580,7 +580,10 @@ const STYLES = `
   .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
     background: var(--bgColor-attention-muted, #fff8c5); }
   .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
-  header > span { display: flex; gap: 4px; }
+  header > span { display: flex; gap: 6px; align-items: center; }
+  .menu-toggle { padding: 2px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; color: inherit;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .menu-toggle:hover, .menu-toggle.open { background: var(--bgColor-muted, #f6f8fa); border-color: #8250df; }
   .title { cursor: pointer; }
   .summary { color: var(--fgColor-muted, #59636e); }
   .activity { font-size: 12px; color: var(--fgColor-muted, #59636e); }
