@@ -443,13 +443,13 @@ export class TourPanel {
   }
 
   header() {
-    const onDiff = parsePullRequestPath(location.pathname)?.onDiff;
+    const { onDiff, onCommits } = parsePullRequestPath(location.pathname) ?? {};
     const { owner, repo, number } = this.pr;
-    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
+    const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">${esc(onCommits ? this.t("allChanges") : "Files changed")}</a>`;
     return `<header><strong>PR Docent</strong><span>
         ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${svg(this.menuOpen ? "up" : "down", 12)}</button>` : ""}
         <button class="close" data-action="close" data-tip="${esc(this.t("close"))}" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
-      ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
+      ${onDiff ? "" : `<p class="status">${esc(this.t(onCommits ? "onlyAllChanges" : "onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
   generateButton(label = this.t("generate"), variant = "") {

@@ -29,9 +29,12 @@ const STICKY_HEADER_HEIGHT = 80;
 
 /** Parses /:owner/:repo/pull/:number[/files|/changes] — null when not a PR page. */
 export function parsePullRequestPath(pathname) {
-  const match = pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/(files|changes))?\/?$/);
+  const match = pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/(files|changes)(\/[0-9a-f]{7,40}(?:\.\.[0-9a-f]{7,40})?)?)?\/?$/);
   if (!match) return null;
-  return { owner: match[1], repo: match[2], number: Number(match[3]), onDiff: Boolean(match[4]) };
+  // Files changed for one commit or a range of them (/changes/<sha> or /changes/<sha>..<sha>):
+  // tours cover the whole PR, so their line numbers may not match there.
+  const onCommits = Boolean(match[5]);
+  return { owner: match[1], repo: match[2], number: Number(match[3]), onDiff: Boolean(match[4]) && !onCommits, onCommits };
 }
 
 export async function sha256Hex(text) {

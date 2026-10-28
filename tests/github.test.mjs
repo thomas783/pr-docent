@@ -4,9 +4,14 @@ import { frameCss, parsePullRequestPath, rowSelectors, sha256Hex } from "../src/
 
 describe("parsePullRequestPath", () => {
   it("recognizes PR pages and the diff tab", () => {
-    assert.deepEqual(parsePullRequestPath("/your-org/your-repo/pull/2/changes"), { owner: "your-org", repo: "your-repo", number: 2, onDiff: true });
-    assert.deepEqual(parsePullRequestPath("/o/r/pull/7/files"), { owner: "o", repo: "r", number: 7, onDiff: true });
+    assert.deepEqual(parsePullRequestPath("/your-org/your-repo/pull/2/changes"), { owner: "your-org", repo: "your-repo", number: 2, onDiff: true, onCommits: false });
+    assert.deepEqual(parsePullRequestPath("/o/r/pull/7/files"), { owner: "o", repo: "r", number: 7, onDiff: true, onCommits: false });
     assert.equal(parsePullRequestPath("/o/r/pull/7").onDiff, false);
+  });
+  it("tells a commit or a range of commits apart from all changes", () => {
+    for (const path of ["/o/r/pull/7/changes/b762512924e10469649b0098796eb22d2fd96b52", "/o/r/pull/7/changes/b762512..df11f31", "/o/r/pull/7/files/b762512"]) {
+      assert.deepEqual(parsePullRequestPath(path), { owner: "o", repo: "r", number: 7, onDiff: false, onCommits: true }, path);
+    }
   });
   it("ignores other pages", () => {
     for (const path of ["/o/r", "/o/r/pulls", "/o/r/pull/7/commits", "/o/r/issues/7"]) assert.equal(parsePullRequestPath(path), null);
