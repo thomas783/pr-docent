@@ -50,9 +50,10 @@ export class TourPanel {
     this.host = document.createElement("div");
     this.host.id = "prdocent-root";
     this.root = this.host.attachShadow({ mode: "open" });
-    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">${svg("play", 12)} PR Docent</button><aside class="panel" hidden></aside>`;
+    this.root.innerHTML = `<style>${STYLES}</style><button class="launcher" title="PR Docent">${svg("play", 12)} PR Docent</button><aside class="panel" hidden></aside><div class="tip" hidden></div>`;
     this.launcher = this.root.querySelector(".launcher");
     this.panel = this.root.querySelector(".panel");
+    this.showTips();
     this.unitIndex = 0;
     this.launcher.addEventListener("click", () => this.toggleOpen());
     this.onKeyDown = (event) => this.handleShortcut(event);
@@ -378,19 +379,19 @@ export class TourPanel {
     const total = this.player.steps.length;
     const uncovered = uncoveredFiles(tour, listPullRequestFiles());
     const icon = (action, glyph, label, disabled = false, cls = "") =>
-      `<button class="icon ${cls}" data-action="${action}" title="${esc(label)}" aria-label="${esc(label)}" ${disabled ? "disabled" : ""}>${glyph}</button>`;
+      `<button class="icon ${cls}" data-action="${action}" data-tip="${esc(label)}" aria-label="${esc(label)}" ${disabled ? "disabled" : ""}>${glyph}</button>`;
 
     this.panel.innerHTML = `
       ${this.header()}
       ${this.menuOpen ? this.menu(tour) : ""}
       <div class="content">
-      <h2 class="title" data-action="summary" title="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
+      <h2 class="title" data-action="summary" data-tip="${esc(this.t("prSummary"))}">${esc(tour.title || this.t("untitledTour"))}</h2>
       ${this.summaryOpen && tour.summary ? `<p class="summary">${esc(tour.summary)}</p>` : ""}
       ${this.activity()}
 
       <section class="step">
         <p class="chapter">${esc(step.chapterTitle)}</p>
-        <p class="file" title="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}
+        <p class="file" data-tip="${esc(step.file)}" data-action="refocus">${esc(step.file)}${step.lines ? `<span>:${step.lines[0]}-${step.lines[1]}</span>` : ""}
           <span class="level ${step.level}">${esc(this.t(`level_${step.level}`))}</span></p>
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
@@ -432,6 +433,36 @@ export class TourPanel {
     </div>`;
   }
 
+  /**
+   * Tooltips for [data-tip] elements. The browser's own (title) waits about a second and can't
+   * be sped up, so the panel draws its own, kept inside the window.
+   */
+  showTips() {
+    const tip = this.root.querySelector(".tip");
+    let timer;
+    const hide = () => {
+      clearTimeout(timer);
+      tip.hidden = true;
+    };
+    this.panel.addEventListener("pointerover", (event) => {
+      const target = event.target.closest("[data-tip]");
+      if (!target) return hide();
+      clearTimeout(timer);
+      // Moving from one control to the next shows the next tip right away.
+      timer = setTimeout(() => {
+        tip.textContent = target.dataset.tip;
+        tip.hidden = false;
+        const box = target.getBoundingClientRect();
+        const left = Math.min(Math.max(8, box.left + box.width / 2 - tip.offsetWidth / 2), innerWidth - tip.offsetWidth - 8);
+        const above = box.top - tip.offsetHeight - 6;
+        tip.style.left = `${left}px`;
+        tip.style.top = `${above >= 8 ? above : box.bottom + 6}px`;
+      }, tip.hidden ? 200 : 0);
+    });
+    this.panel.addEventListener("pointerleave", hide);
+    this.panel.addEventListener("click", hide);
+  }
+
   /** What the local helper is doing, if anything. */
   activity() {
     const busy = this.generating ?? this.shorting;
@@ -444,7 +475,7 @@ export class TourPanel {
     const link = `<a href="/${esc(owner)}/${esc(repo)}/pull/${number}/changes" data-action="changes">Files changed</a>`;
     return `<header><strong>PR Docent</strong><span>
         ${this.player ? `<button class="menu-toggle${this.menuOpen ? " open" : ""}" data-action="menu" aria-expanded="${this.menuOpen}">${esc(this.t("more"))} ${svg(this.menuOpen ? "up" : "down", 12)}</button>` : ""}
-        <button class="close" data-action="close" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
+        <button class="close" data-action="close" data-tip="${esc(this.t("close"))}" aria-label="${esc(this.t("close"))}">${svg("close")}</button></span></header>
       ${onDiff ? "" : `<p class="status">${esc(this.t("onlyOnChanges", "{link}")).replace("{link}", link)}</p>`}`;
   }
 
@@ -590,6 +621,9 @@ const STYLES = `
     font-size: 13px; line-height: 1.5;
   }
   .panel[hidden] { display: none; }
+  .tip { position: fixed; z-index: 2147483001; max-width: 280px; padding: 4px 8px; border-radius: 6px; pointer-events: none;
+    background: #25292e; color: #fff; font-size: 12px; line-height: 1.4; word-break: break-all; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .tip[hidden] { display: none; }
   /* Header on top, controls pinned at the bottom, everything in between scrolls. */
   .content { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 0 16px; }
   .footer { flex: none; padding-top: 8px; border-top: 1px solid var(--borderColor-muted, #d1d9e0b3); }
