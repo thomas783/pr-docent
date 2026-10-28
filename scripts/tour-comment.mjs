@@ -21,7 +21,7 @@ const TEXT = {
     madeFor: (sha) => `Made for commit \`${sha}\`.`,
     howTo: (chapters, steps) => `Click **PR Docent** on the Files changed tab to play this tour (${chapters} chapters, ${steps} steps).`,
     chapters: "### Chapters",
-    stepCount: (n) => `(${n} steps)`,
+    stepCount: (n) => `(${n} ${n === 1 ? "step" : "steps"})`,
     points: "### Review points",
     skipped: "Skipped files",
     short: (title) => `### 🎬 Short: ${title}`,
