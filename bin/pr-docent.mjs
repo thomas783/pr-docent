@@ -51,6 +51,7 @@ function install(args) {
   } catch {
     fail("Claude Code (claude) was not found on PATH. Install it and log in first: https://claude.com/claude-code");
   }
+  const signedIn = claudeSignedIn(claude);
   const extraIds = args.flatMap((arg, i) => (arg === "--extension-id" && args[i + 1] ? [args[i + 1]] : []));
   const extensionIds = [...new Set([...EXTENSION_IDS, ...extraIds])];
 
@@ -82,9 +83,28 @@ function install(args) {
   Chrome host manifest: ${hostManifest}
   Generator:            ${app}
   Allowed extensions:   ${extensionIds.join(", ")}
-  Claude Code:          ${claude}
+  Claude Code:          ${claude}${signedIn ? "" : " (not signed in)"}
 Reload the extension in chrome://extensions, then click "Create a tour with local Claude Code"
 in the panel ("로컬 Claude Code로 투어 생성" in Korean).`);
+  if (!signedIn) console.log("\nClaude Code isn't signed in yet, so tours can't be created. Run `claude` and sign in with /login.");
+}
+
+/**
+ * Whether Claude Code is signed in, from `claude auth status` (JSON with loggedIn, exit 1 when
+ * signed out). Versions without that command count as signed in: there's no telling.
+ */
+function claudeSignedIn(claude) {
+  let output;
+  try {
+    output = execFileSync(claude, ["auth", "status", "--json"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch (error) {
+    output = error.stdout;
+  }
+  try {
+    return JSON.parse(output).loggedIn !== false;
+  } catch {
+    return true;
+  }
 }
 
 function uninstall() {

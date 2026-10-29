@@ -107,6 +107,8 @@ Setup (once per computer, macOS and Linux)
    This copies the helper and a launcher script to `~/.pr-docent/` and writes `dev.prdocent.host.json` to Chrome's `NativeMessagingHosts` folder. Only this extension (ID `hleefogoiedjahnmjgmmgonckaeicppc`) may connect; add other IDs with `--extension-id <ID>`. In this repository `npm run install-host` does the same.
 3. Reload the extension in `chrome://extensions`.
 
+If a step is missing, the panel says which: without the local helper it shows these steps with a button that copies the command, and it tells you when Claude Code can't be found or isn't signed in. `npx pr-docent install` also warns when Claude Code isn't signed in.
+
 How it works
 - The extension fetches the pull request's diff and changed files with your session and hands them to the local helper (`host/pr-docent-host.mjs`).
 - The helper runs `claude -p` in a temporary folder with the same prompt and checker as GitHub Actions; Claude may write only the tour file.

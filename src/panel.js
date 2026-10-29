@@ -13,6 +13,7 @@ import { narrationUnits, parseTour, pickTour, tourFileName, tourFreshness, tourL
 
 const PANEL_WIDTH = 360;
 const SETTINGS_KEY = "prdocent:settings";
+const SETUP_COMMAND = "npx pr-docent install";
 const SPEECH_LOCALES = { ko: "ko-KR", en: "en-US" };
 
 export class TourPanel {
@@ -64,6 +65,38 @@ export class TourPanel {
 
   errorText(error) {
     return error.i18n ? this.t(...error.i18n) : error.message;
+  }
+
+  /**
+   * Says why the local helper couldn't do [key]'s action: set-up steps when the helper isn't
+   * installed, what to do when Claude Code is missing or signed out, otherwise the error itself.
+   */
+  showFailure(error, key) {
+    this.setupNeeded = Boolean(error.notInstalled);
+    this.status = error.notInstalled ? ""
+      : error.code === "claudeMissing" || error.code === "claudeLoggedOut" ? this.t(error.code)
+      : this.t(key, this.errorText(error));
+  }
+
+  /** The one-time set-up for local generation, shown when the local helper isn't installed. */
+  setupGuide() {
+    if (!this.setupNeeded) return "";
+    return `<div class="setup"><p><b>${esc(this.t("setupTitle"))}</b></p><ol>
+      <li>${esc(this.t("setupClaude"))} <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a></li>
+      <li>${esc(this.t("setupInstall"))}<br><code>${SETUP_COMMAND}</code>
+        <button data-action="copySetup">${esc(this.t(this.copied ? "copied" : "copy"))}</button></li>
+      <li>${esc(this.t("setupReload"))}</li></ol>
+      <p class="muted">${esc(this.t("setupOptional"))}</p></div>`;
+  }
+
+  async copySetup() {
+    await navigator.clipboard.writeText(SETUP_COMMAND).catch(() => {});
+    this.copied = true;
+    this.render();
+    setTimeout(() => {
+      this.copied = false;
+      this.render();
+    }, 1500);
   }
 
   /**
@@ -161,6 +194,7 @@ export class TourPanel {
     this.menuOpen = false;
     this.generating = this.t("readingPr");
     this.status = "";
+    this.setupNeeded = false;
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
@@ -184,7 +218,7 @@ export class TourPanel {
       this.render();
     } catch (error) {
       this.generating = null;
-      this.status = error.notInstalled ? this.t("hostMissing") : this.t("generateFailed", this.errorText(error));
+      this.showFailure(error, "generateFailed");
       this.render();
     }
   }
@@ -195,6 +229,7 @@ export class TourPanel {
     this.menuOpen = false;
     this.shorting = this.t("readingPr");
     this.status = "";
+    this.setupNeeded = false;
     this.render();
     try {
       const details = await fetchPullRequestDetails(this.pr);
@@ -212,7 +247,7 @@ export class TourPanel {
       this.playShort();
     } catch (error) {
       this.shorting = null;
-      this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
+      this.showFailure(error, "shortFailed");
       this.render();
     }
   }
@@ -223,6 +258,7 @@ export class TourPanel {
     this.menuOpen = false;
     this.shorting = this.t("shortRender", "");
     this.status = "";
+    this.setupNeeded = false;
     this.render();
     try {
       this.videoPath = await saveShortVideo(this.short, (progress) => {
@@ -232,7 +268,7 @@ export class TourPanel {
       await storageSet(`prdocent:video:${this.key}`, this.videoPath);
       this.status = this.t("videoSaved", this.videoPath.split("/").pop());
     } catch (error) {
-      this.status = error.notInstalled ? this.t("hostMissing") : this.t("shortFailed", this.errorText(error));
+      this.showFailure(error, "shortFailed");
     }
     this.shorting = null;
     this.render();
@@ -368,6 +404,7 @@ export class TourPanel {
           <p class="muted">${esc(this.t("noTour"))}</p>
           ${this.generateButton()}
           ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
+          ${this.setupGuide()}
         </div>`;
       return this.bind();
     }
@@ -397,6 +434,7 @@ export class TourPanel {
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
+          ${this.setupGuide()}
       </section>
       ${this.chaptersOpen ? `<ol class="chapters">${tour.chapters.map((c, i) => `<li class="${i === step.chapterIndex ? "current" : ""}" data-chapter="${i}"><b>${esc(c.title)}</b>${c.summary ? `<small>${esc(c.summary)}</small>` : ""}</li>`).join("")}</ol>` : ""}
       ${uncovered.length ? `<details class="uncovered"><summary>${esc(this.t("uncoveredFiles", uncovered.length))}</summary><ul>${uncovered.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details>` : ""}
@@ -523,6 +561,7 @@ export class TourPanel {
       tab.click();
     });
     on("generate", "click", () => this.generate());
+    on("copySetup", "click", () => this.copySetup());
     on("short", "click", () => this.makeShort());
     on("video", "click", () => this.saveVideo());
     on("reveal", "click", () => this.videoPath && revealFile(this.videoPath).catch(() => {}));
@@ -656,6 +695,13 @@ const STYLES = `
   p { margin: 4px 0; }
   .muted { color: var(--fgColor-muted, #59636e); }
   .status { color: var(--fgColor-attention, #9a6700); }
+  .setup { margin: 8px 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .setup p { margin: 0 0 4px; }
+  .setup ol { margin: 4px 0; padding-left: 18px; }
+  .setup li { margin: 4px 0; }
+  .setup code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--bgColor-muted, #f6f8fa); }
+  .setup button { margin-left: 4px; padding: 1px 8px; border-radius: 6px; cursor: pointer; color: inherit; font-size: 11px;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
   .ask { margin: 8px 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
   .ask p { margin: 0 0 6px; }
   .ask button { margin-right: 6px; padding: 3px 10px; border-radius: 6px; cursor: pointer; color: inherit;

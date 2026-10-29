@@ -36,7 +36,7 @@ function askHost(name, request, onProgress) {
     port.onMessage.addListener((message) => {
       if (message.type === "progress") onProgress(message);
       else if (message.type === "done") finish(resolve, message);
-      else if (message.type === "error") finish(reject, Object.assign(new Error(message.message), { notInstalled: message.notInstalled }));
+      else if (message.type === "error") finish(reject, Object.assign(new Error(message.message), { notInstalled: message.notInstalled, code: message.code }));
     });
     port.onDisconnect.addListener(() => finish(reject, i18nError("generationStopped")));
     port.postMessage(request);
