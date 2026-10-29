@@ -81,6 +81,7 @@ jobs:
           # Edit(path) also covers the Write tool, so Claude can create only the tour file
           # ("//" marks an absolute path in permission rules).
           claude -p "$(cat "$RUNNER_TEMP/prompt.md")" \
+            --strict-mcp-config \
             --model "${{ inputs.model }}" \
             --permission-mode dontAsk \
             --allowedTools "Read,Glob,Grep,Edit(/$OUT/tour.json),Bash(node $TOOLS/scripts/check-tour.mjs:*),Bash(git log:*),Bash(git show:*)"
@@ -110,6 +111,7 @@ jobs:
         run: |
           node "$TOOLS/scripts/build-prompt.mjs" "$PR" "$OUT" "$TOOLS" "$LANGUAGE" short > "$RUNNER_TEMP/short-prompt.md"
           claude -p "$(cat "$RUNNER_TEMP/short-prompt.md")" \
+            --strict-mcp-config \
             --model "${{ inputs.model }}" \
             --permission-mode dontAsk \
             --allowedTools "Read,Glob,Grep,Edit(/$OUT/short.json),Bash(node $TOOLS/scripts/check-short.mjs:*)"
