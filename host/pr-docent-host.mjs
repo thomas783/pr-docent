@@ -28,7 +28,7 @@ process.stdin.on(
     const reply = (promise, toMessage) =>
       promise
         .then((value) => send(toMessage(value)))
-        .catch((error) => send({ type: "error", message: error.message }))
+        .catch((error) => send({ type: "error", message: error.message, code: error.code }))
         // Exit once stdout has flushed: on macOS pipe writes are asynchronous.
         .finally(() => process.stdout.write("", () => process.exit(0)));
     if (message.type === "generate") {

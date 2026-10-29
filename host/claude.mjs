@@ -40,6 +40,14 @@ export function prepareWorkspace({ files, diff, title, body, headSha }) {
   return { work, repo, out };
 }
 
+/**
+ * Why Claude Code failed, for the panel to say what to do: "claudeLoggedOut" when its output says
+ * it isn't signed in (Claude Code 2.1: "Not logged in · Please run /login"), otherwise undefined.
+ */
+export function failureCode(output) {
+  return /not logged in|please run \/login|invalid api key|oauth token has expired/i.test(output) ? "claudeLoggedOut" : undefined;
+}
+
 /** Runs `claude -p [prompt]` in [cwd]; reports elapsed seconds every 5s through [onProgress]. */
 export function runClaude(prompt, cwd, args, onProgress = () => {}) {
   return new Promise((resolvePromise, reject) => {
@@ -51,13 +59,15 @@ export function runClaude(prompt, cwd, args, onProgress = () => {}) {
     child.stderr.on("data", keep);
     const progress = setInterval(() => onProgress(Math.round((Date.now() - started) / 1000)), 5000);
     const timeout = setTimeout(() => child.kill(), TIMEOUT_MS);
-    child.on("error", (error) => reject(new Error(`Could not start Claude Code (${CONFIG.claude}): ${error.message}`)));
+    child.on("error", (error) =>
+      reject(Object.assign(new Error(`Could not start Claude Code (${CONFIG.claude}): ${error.message}`), { code: "claudeMissing" })),
+    );
     child.on("close", (code) => {
       clearInterval(progress);
       clearTimeout(timeout);
       child = null;
       if (code === 0) resolvePromise();
-      else reject(new Error(`Claude Code exited with code ${code}. ${output.trim().slice(-300)}`));
+      else reject(Object.assign(new Error(`Claude Code exited with code ${code}. ${output.trim().slice(-300)}`), { code: failureCode(output) }));
     });
   });
 }
