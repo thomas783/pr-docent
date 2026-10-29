@@ -3,8 +3,9 @@
 import { createHash } from "node:crypto";
 
 export const HOST_NAME = "dev.prdocent.host";
-// Extensions the host accepts by default: the unpacked install, whose ID manifest.json's key fixes.
-export const EXTENSION_IDS = ["hleefogoiedjahnmjgmmgonckaeicppc"];
+// Extensions the host accepts by default: the unpacked install, whose ID manifest.json's key fixes,
+// and the Chrome Web Store release.
+export const EXTENSION_IDS = ["hleefogoiedjahnmjgmmgonckaeicppc", "deejphpcfjilekklajdhdhfepjbenjii"];
 
 /** Chrome native messaging frames each message as a 32-bit little-endian length plus UTF-8 JSON. */
 export function encodeMessage(value) {
