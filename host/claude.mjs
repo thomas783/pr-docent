@@ -53,7 +53,10 @@ export function runClaude(prompt, cwd, args, onProgress = () => {}) {
   return new Promise((resolvePromise, reject) => {
     const started = Date.now();
     let output = "";
-    child = spawn(CONFIG.claude, ["-p", prompt, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    // --strict-mcp-config without --mcp-config: none of the user's MCP servers start. A tour needs
+    // none, and starting them is slow and can set off macOS prompts (e.g. a quarantined Python
+    // module in an MCP server's uv cache).
+    child = spawn(CONFIG.claude, ["-p", prompt, "--strict-mcp-config", ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     const keep = (chunk) => (output = (output + chunk).slice(-2000));
     child.stdout.on("data", keep);
     child.stderr.on("data", keep);
