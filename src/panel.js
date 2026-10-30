@@ -90,6 +90,7 @@ export class TourPanel {
         <button data-action="copySetup">${esc(this.t(this.copied ? "copied" : "copy"))}</button></li>
       <li>${esc(this.t("setupReload"))}</li></ol>
       <p class="muted">${esc(this.t("setupOptional"))}</p>
+      <p class="muted">${esc(this.t("setupProfile"))}</p>
       ${this.setupDetail ? `<p class="detail">${esc(this.setupDetail)}</p>` : ""}</div>`;
   }
 
