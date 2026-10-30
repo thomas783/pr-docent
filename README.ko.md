@@ -104,7 +104,7 @@ PR이 열리거나 커밋이 추가될 때마다 Claude Code가 diff를 읽고 �
    ```bash
    npx pr-docent install
    ```
-   `~/.pr-docent/`에 도우미 파일과 실행 스크립트를 복사하고, Google Chrome과 설치된 다른 Chromium 브라우저(Chrome Beta/Dev/Canary, Chromium, Brave, Edge)의 `NativeMessagingHosts` 폴더에 `dev.prdocent.host.json`을 만듭니다. 자동화 도구처럼 `--user-data-dir`로 실행한 브라우저는 그 폴더에서 찾습니다. 실행 중인 브라우저는 자동으로 찾고, 아니면 `--user-data-dir <폴더>`를 붙입니다(`chrome://version`의 "프로필 경로"에서 마지막 프로필 이름을 뺀 폴더). PR Docent만 연결할 수 있으며(Chrome 웹 스토어 버전 ID `deejphpcfjilekklajdhdhfepjbenjii`, 개발용 설치 ID `hleefogoiedjahnmjgmmgonckaeicppc`), 다른 ID는 `--extension-id <ID>`로 추가합니다. 이 저장소에서는 `npm run install-host`도 같습니다.
+   `~/.pr-docent/`에 도우미 파일과 실행 스크립트를 복사하고, Google Chrome과 설치된 다른 Chromium 브라우저(Chrome Beta/Dev/Canary, Chromium, Brave, Edge, Arc, Vivaldi, Opera, 웨일)의 `NativeMessagingHosts` 폴더에 `dev.prdocent.host.json`을 만듭니다. 자동화 도구처럼 `--user-data-dir`로 실행한 브라우저는 그 폴더에서 찾습니다. 실행 중인 브라우저는 자동으로 찾고, 아니면 `--user-data-dir <폴더>`를 붙입니다(`chrome://version`의 "프로필 경로"에서 마지막 프로필 이름을 뺀 폴더). PR Docent만 연결할 수 있으며(Chrome 웹 스토어 버전 ID `deejphpcfjilekklajdhdhfepjbenjii`, 개발용 설치 ID `hleefogoiedjahnmjgmmgonckaeicppc`), 다른 ID는 `--extension-id <ID>`로 추가합니다. 이 저장소에서는 `npm run install-host`도 같습니다.
 3. `chrome://extensions`에서 확장을 새로고침합니다.
 
 빠진 단계가 있으면 패널이 알려 줍니다. 로컬 도우미가 없으면 위 단계를 명령 복사 버튼과 함께 보여 주고, Claude Code를 찾을 수 없거나 로그인되어 있지 않으면 그렇게 안내합니다. `npx pr-docent install`도 Claude Code에 로그인되어 있지 않으면 알려 줍니다.

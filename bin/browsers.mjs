@@ -5,14 +5,18 @@
 
 import { join } from "node:path";
 
-// User data folders of Chromium browsers that can install from the Chrome Web Store.
+// User data folders of Chromium browsers that can install from the Chrome Web Store (the same
+// folders Claude's and Codex's browser extensions register their hosts in; Whale's is its user
+// data folder, unverified, and like the others only used when it exists).
 const USER_DATA_DIRS = {
   darwin: [
     "Google/Chrome", "Google/Chrome Beta", "Google/Chrome Dev", "Google/Chrome Canary", "Google/Chrome for Testing",
-    "Chromium", "BraveSoftware/Brave-Browser", "Microsoft Edge",
+    "Chromium", "BraveSoftware/Brave-Browser", "Microsoft Edge", "Arc/User Data", "Vivaldi", "com.operasoftware.Opera",
+    "Naver/Whale",
   ].map((dir) => ["Library", "Application Support", ...dir.split("/")]),
   linux: [
     "google-chrome", "google-chrome-beta", "google-chrome-unstable", "chromium", "BraveSoftware/Brave-Browser", "microsoft-edge",
+    "vivaldi", "opera", "naver-whale",
   ].map((dir) => [".config", ...dir.split("/")]),
 };
 
@@ -23,8 +27,8 @@ export function browserDataDirs(home, os) {
 
 // The main executable of a Chromium browser (not its helper processes), at the start of a command.
 const BROWSER_COMMAND = {
-  darwin: /^\S.*?\/(Google Chrome(?: Beta| Dev| Canary| for Testing)?|Chromium|Brave Browser|Microsoft Edge)\.app\/Contents\/MacOS\/\1(?= |$)/,
-  linux: /^\S*?(?:^|\/)(?:chrome|google-chrome(?:-beta|-unstable)?|chromium(?:-browser)?|brave(?:-browser)?|msedge|microsoft-edge)(?= |$)/,
+  darwin: /^\S.*?\/(Google Chrome(?: Beta| Dev| Canary| for Testing)?|Chromium|Brave Browser|Microsoft Edge|Arc|Vivaldi|Opera|Naver Whale)\.app\/Contents\/MacOS\/\1(?= |$)/,
+  linux: /^\S*?(?:^|\/)(?:chrome|google-chrome(?:-beta|-unstable)?|chromium(?:-browser)?|brave(?:-browser)?|msedge|microsoft-edge|vivaldi(?:-bin|-stable)?|opera|naver-whale(?:-stable)?|whale)(?= |$)/,
 };
 
 /**
