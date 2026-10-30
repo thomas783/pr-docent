@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PR Docent's local generator setup.
 //
-//   npx pr-docent install [--extension-id <id>]...   register with Chrome (once per computer)
+//   npx pr-docent install [--user-data-dir <dir>]... [--extension-id <id>]...
+//                                                     register with Chrome (once per computer)
 //   npx pr-docent uninstall                           remove the registration and files
 //   npx pr-docent short <owner/repo#n | PR URL>       make a short video of a PR (macOS, needs gh)
 //
@@ -10,11 +11,12 @@
 // with a bare environment.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXTENSION_IDS, HOST_NAME } from "../host/native.mjs";
+import { browserDataDirs, runningUserDataDirs } from "./browsers.mjs";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // What the host needs at run time; everything else in the package is for the extension or tests.
@@ -23,15 +25,10 @@ const RUNTIME_FILES = [
   "src/diff.js", "src/guidelines.js", "src/short.js", "src/short-scenes.js", "src/tour.js",
   "scripts/check-short.mjs", "scripts/check-tour.mjs", "scripts/short-prompt.md", "scripts/tour-prompt.md",
 ];
-const HOSTS_DIRS = {
-  darwin: join(homedir(), "Library", "Application Support", "Google", "Chrome", "NativeMessagingHosts"),
-  linux: join(homedir(), ".config", "google-chrome", "NativeMessagingHosts"),
-};
 const CONFIG_DIR = join(homedir(), ".pr-docent");
 
 const [command = "help", ...args] = process.argv.slice(2);
-const hostsDir = HOSTS_DIRS[platform()];
-const hostManifest = hostsDir && join(hostsDir, `${HOST_NAME}.json`);
+const hostManifest = (dataDir) => join(dataDir, "NativeMessagingHosts", `${HOST_NAME}.json`);
 
 if (command === "install") install(args);
 else if (command === "uninstall") uninstall();
@@ -39,12 +36,13 @@ else if (command === "short") {
   const { shortCommand } = await import("../host/short-cli.mjs");
   await shortCommand(args).catch((error) => fail(error.message));
 } else {
-  console.log("usage: pr-docent install [--extension-id <id>]... | pr-docent uninstall | pr-docent short <owner/repo#number>");
+  console.log("usage: pr-docent install [--user-data-dir <dir>]... [--extension-id <id>]... | pr-docent uninstall | pr-docent short <owner/repo#number>");
   process.exit(command === "help" ? 0 : 2);
 }
 
 function install(args) {
-  if (!hostsDir) fail(`Not supported on ${platform()} yet (macOS and Linux only).`);
+  const defaults = browserDataDirs(homedir(), platform());
+  if (!defaults.length) fail(`Not supported on ${platform()} yet (macOS and Linux only).`);
   let claude;
   try {
     claude = execFileSync("which", ["claude"], { encoding: "utf8" }).trim();
@@ -52,7 +50,17 @@ function install(args) {
     fail("Claude Code (claude) was not found on PATH. Install it and log in first: https://claude.com/claude-code");
   }
   const signedIn = claudeSignedIn(claude);
-  const extraIds = args.flatMap((arg, i) => (arg === "--extension-id" && args[i + 1] ? [args[i + 1]] : []));
+  const option = (name) => args.flatMap((arg, i) => (arg === name && args[i + 1] ? [args[i + 1]] : []));
+  const extraIds = option("--extension-id");
+  // Google Chrome, other installed Chromium browsers, folders running browsers were started with
+  // (automation tools pass --user-data-dir), and folders given with --user-data-dir.
+  const dataDirs = [...new Set([
+    defaults[0],
+    ...defaults.slice(1).filter((dir) => existsSync(dir)),
+    ...runningBrowserDataDirs(),
+    ...option("--user-data-dir").map((dir) => resolve(dir.replace(/^~(?=$|\/)/, homedir()))),
+  ])];
+  const manifests = dataDirs.map(hostManifest);
   const extensionIds = [...new Set([...EXTENSION_IDS, ...extraIds])];
 
   const app = join(CONFIG_DIR, "app");
@@ -62,14 +70,14 @@ function install(args) {
     cpSync(join(PACKAGE_ROOT, file), join(app, file));
   }
   writeFileSync(join(app, "package.json"), `${JSON.stringify({ type: "module" })}\n`); // src/*.js are ES modules
-  writeFileSync(join(CONFIG_DIR, "config.json"), `${JSON.stringify({ claude }, null, 2)}\n`);
+  // manifests: every registration, for uninstall.
+  writeFileSync(join(CONFIG_DIR, "config.json"), `${JSON.stringify({ claude, manifests }, null, 2)}\n`);
 
   const quote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
   const wrapper = join(CONFIG_DIR, "host.sh");
   writeFileSync(wrapper, hostScript({ path: process.env.PATH, node: process.execPath, host: join(app, "host", "pr-docent-host.mjs"), quote }));
   chmodSync(wrapper, 0o755);
 
-  mkdirSync(hostsDir, { recursive: true });
   const manifest = {
     name: HOST_NAME,
     description: "PR Docent local tour generator",
@@ -77,10 +85,13 @@ function install(args) {
     type: "stdio",
     allowed_origins: extensionIds.map((id) => `chrome-extension://${id}/`),
   };
-  writeFileSync(hostManifest, `${JSON.stringify(manifest, null, 2)}\n`);
+  for (const path of manifests) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
 
   console.log(`Installed the PR Docent local generator.
-  Chrome host manifest: ${hostManifest}
+  Registered for:       ${dataDirs.join("\n                        ")}
   Generator:            ${app}
   Allowed extensions:   ${extensionIds.join(", ")}
   Claude Code:          ${claude}${signedIn ? "" : " (not signed in)"}
@@ -130,10 +141,26 @@ exec "$NODE" ${quote(host)} 2>>"$LOG"
 `;
 }
 
+/** --user-data-dir folders of running browsers; none when ps isn't available. */
+function runningBrowserDataDirs() {
+  try {
+    return runningUserDataDirs(execFileSync("ps", ["-axo", "command="], { encoding: "utf8" }), platform());
+  } catch {
+    return [];
+  }
+}
+
 function uninstall() {
+  let manifests = browserDataDirs(homedir(), platform()).map(hostManifest);
+  try {
+    manifests = [...new Set([...manifests, ...JSON.parse(readFileSync(join(CONFIG_DIR, "config.json"), "utf8")).manifests])];
+  } catch {
+    // installed by an older version: only the default folders
+  }
+  const removed = manifests.filter((path) => existsSync(path));
+  for (const path of removed) rmSync(path, { force: true });
   rmSync(CONFIG_DIR, { recursive: true, force: true });
-  if (hostManifest) rmSync(hostManifest, { force: true });
-  console.log(`Removed ${CONFIG_DIR}${hostManifest ? ` and ${hostManifest}` : ""}.`);
+  console.log(`Removed ${[CONFIG_DIR, ...removed].join(", ")}.`);
 }
 
 function fail(message) {
