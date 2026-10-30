@@ -123,7 +123,10 @@ if [ ! -x "$NODE" ]; then
   done
 fi
 if [ ! -x "$NODE" ]; then NODE=$(command -v node); fi
-exec "$NODE" ${quote(host)}
+# Chrome shows none of the helper's errors; keep them for troubleshooting, emptied past 100 KB.
+LOG="$HOME/.pr-docent/host.log"
+if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 100000 ]; then : > "$LOG"; fi
+exec "$NODE" ${quote(host)} 2>>"$LOG"
 `;
 }
 
