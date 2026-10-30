@@ -66,7 +66,7 @@ function install(args) {
 
   const quote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
   const wrapper = join(CONFIG_DIR, "host.sh");
-  writeFileSync(wrapper, `#!/bin/sh\nexport PATH=${quote(process.env.PATH)}\nexec ${quote(process.execPath)} ${quote(join(app, "host", "pr-docent-host.mjs"))}\n`);
+  writeFileSync(wrapper, hostScript({ path: process.env.PATH, node: process.execPath, host: join(app, "host", "pr-docent-host.mjs"), quote }));
   chmodSync(wrapper, 0o755);
 
   mkdirSync(hostsDir, { recursive: true });
@@ -105,6 +105,26 @@ function claudeSignedIn(claude) {
   } catch {
     return true;
   }
+}
+
+/**
+ * The script Chrome starts. It runs the Node that installed it, but version managers (nvm, fnm)
+ * remove that Node when the user switches versions, so it then falls back to another one.
+ */
+function hostScript({ path, node, host, quote }) {
+  return `#!/bin/sh
+export PATH=${quote(path)}
+NODE=${quote(node)}
+if [ ! -x "$NODE" ]; then
+  for candidate in "$HOME"/.nvm/versions/node/*/bin/node "$HOME"/.local/share/fnm/node-versions/*/installation/bin/node \\
+    "$HOME"/Library/Application\\ Support/fnm/node-versions/*/installation/bin/node "$HOME"/.volta/bin/node \\
+    /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
+    if [ -x "$candidate" ]; then NODE="$candidate"; fi
+  done
+fi
+if [ ! -x "$NODE" ]; then NODE=$(command -v node); fi
+exec "$NODE" ${quote(host)}
+`;
 }
 
 function uninstall() {
