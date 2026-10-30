@@ -73,6 +73,9 @@ export class TourPanel {
    */
   showFailure(error, key) {
     this.setupNeeded = Boolean(error.notInstalled);
+    // Chrome's own words, shown small under the steps: the helper may be installed but blocked
+    // (a managed Chrome's policy, another Chrome profile folder), and this tells them apart.
+    this.setupDetail = error.notInstalled ? error.message : "";
     this.status = error.notInstalled ? ""
       : error.code === "claudeMissing" || error.code === "claudeLoggedOut" ? this.t(error.code)
       : this.t(key, this.errorText(error));
@@ -86,7 +89,8 @@ export class TourPanel {
       <li>${esc(this.t("setupInstall"))}<br><code>${SETUP_COMMAND}</code>
         <button data-action="copySetup">${esc(this.t(this.copied ? "copied" : "copy"))}</button></li>
       <li>${esc(this.t("setupReload"))}</li></ol>
-      <p class="muted">${esc(this.t("setupOptional"))}</p></div>`;
+      <p class="muted">${esc(this.t("setupOptional"))}</p>
+      ${this.setupDetail ? `<p class="detail">${esc(this.setupDetail)}</p>` : ""}</div>`;
   }
 
   async copySetup() {
@@ -699,6 +703,7 @@ const STYLES = `
   .setup p { margin: 0 0 4px; }
   .setup ol { margin: 4px 0; padding-left: 18px; }
   .setup li { margin: 4px 0; }
+  .setup .detail { margin-top: 6px; font-size: 11px; color: var(--fgColor-muted, #59636e); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
   .setup code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--bgColor-muted, #f6f8fa); }
   .setup button { margin-left: 4px; padding: 1px 8px; border-radius: 6px; cursor: pointer; color: inherit; font-size: 11px;
     border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); }
