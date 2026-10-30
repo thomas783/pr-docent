@@ -113,6 +113,7 @@ How it works
 - The extension fetches the pull request's diff and changed files with your session and hands them to the local helper (`host/pr-docent-host.mjs`).
 - The helper runs `claude -p` in a temporary folder with the same prompt and checker as GitHub Actions; Claude may write only the tour file.
 - The checked tour is saved for the pull request and starts playing. It usually takes 2-3 minutes.
+- If generating fails, the helper's own errors are in `~/.pr-docent/host.log`.
 - To remove it: `npx pr-docent uninstall`
 
 ## Shorts

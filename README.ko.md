@@ -113,6 +113,7 @@ PR이 열리거나 커밋이 추가될 때마다 Claude Code가 diff를 읽고 �
 - 확장이 로그인 세션으로 PR의 diff와 바뀐 파일을 가져와 로컬 도우미(`host/pr-docent-host.mjs`)에 넘깁니다.
 - 도우미가 임시 폴더에서 `claude -p`를 실행합니다. GitHub Actions와 같은 프롬프트와 검사기를 쓰고, Claude는 투어 파일 하나만 쓸 수 있습니다.
 - 검사를 통과한 투어를 이 PR에 저장하고 바로 재생합니다. 생성에는 보통 2~3분이 걸립니다.
+- 생성이 실패하면 도우미의 오류가 `~/.pr-docent/host.log`에 남습니다.
 - 제거: `npx pr-docent uninstall`
 
 ## 쇼츠
