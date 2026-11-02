@@ -2,7 +2,7 @@
 
 **English** | [한국어](#pr-docent-개인정보-처리방침)
 
-Last updated: 2026-10-28
+Last updated: 2026-11-02
 
 PR Docent is a Chrome extension that plays review tours on GitHub pull requests. It has no server of its own and the developer receives no data from it.
 
@@ -17,7 +17,8 @@ In Chrome's extension storage on your computer only: your settings, tours and sh
 
 ## What it sends, and to whom
 
-- **Nothing to the developer or to any server run by the developer.** There are no analytics, ads or tracking.
+- **Nothing to the developer, except feedback you choose to send.** There are no analytics, ads or tracking.
+- **Feedback, only when you press Send.** The optional feedback form in the toolbar popup sends what you typed, the feedback type (bug, idea or question), the extension version and your interface language to a small relay (a Cloudflare Worker run by the developer) that creates an issue in the public GitHub repository [thomas783/pr-docent](https://github.com/thomas783/pr-docent/issues). **That issue is public**, so don't include private code or personal information. The relay uses your IP address only briefly to limit how often feedback can be sent and does not store it.
 - **Your local Claude Code, only when you ask.** When you click "Create a tour with local Claude Code", "Make a short" or "Save as a video file", the extension hands the pull request's diff, changed files, title and description to the PR Docent local helper on your computer (installed with `npx pr-docent install`). The helper runs Claude Code, which you installed and signed in to yourself; Claude Code sends that content to Anthropic under your own account and Anthropic's terms, as it does whenever you use it. Without the local helper, this never happens.
 - **Narration** uses the speech voices built into your browser and operating system.
 
@@ -35,7 +36,7 @@ Questions: open an issue at https://github.com/thomas783/pr-docent/issues.
 
 [English](#pr-docent-privacy-policy) | **한국어**
 
-최종 수정일: 2026-10-28
+최종 수정일: 2026-11-02
 
 PR Docent는 GitHub 풀 리퀘스트에서 리뷰 투어를 재생하는 Chrome 확장 프로그램입니다. 자체 서버가 없으며, 개발자는 이 확장으로부터 어떤 데이터도 받지 않습니다.
 
@@ -50,7 +51,8 @@ PR Docent는 GitHub 풀 리퀘스트에서 리뷰 투어를 재생하는 Chrome 
 
 ## 보내는 정보와 받는 곳
 
-- **개발자나 개발자가 운영하는 서버로는 아무것도 보내지 않습니다.** 분석, 광고, 추적 기능이 없습니다.
+- **개발자에게는 사용자가 직접 보내는 피드백 말고는 아무것도 보내지 않습니다.** 분석, 광고, 추적 기능이 없습니다.
+- **피드백은 보내기를 눌렀을 때만 보냅니다.** 툴바 팝업의 피드백 양식은 사용자가 입력한 내용, 피드백 종류(버그, 아이디어, 질문), 확장 버전, 화면 언어를 개발자가 운영하는 작은 중계 서버(Cloudflare Worker)로 보내고, 중계 서버가 공개 GitHub 레포 [thomas783/pr-docent](https://github.com/thomas783/pr-docent/issues)에 이슈를 만듭니다. **이 이슈는 공개되므로** 비공개 코드나 개인정보는 넣지 마세요. 중계 서버는 너무 자주 보내지 못하게 하려고 IP 주소를 잠깐 사용하며, 저장하지 않습니다.
 - **사용자가 요청할 때만 사용자의 로컬 Claude Code로 보냅니다.** "로컬 Claude Code로 투어 생성", "쇼츠 만들기", "영상 파일로 저장"을 누르면, 확장은 PR의 diff, 변경된 파일, 제목, 설명을 사용자 컴퓨터의 PR Docent 로컬 도우미(`npx pr-docent install`로 설치)에 넘깁니다. 로컬 도우미는 사용자가 직접 설치하고 로그인한 Claude Code를 실행하며, Claude Code는 평소 사용할 때와 마찬가지로 사용자 본인의 계정과 Anthropic 약관에 따라 그 내용을 Anthropic에 보냅니다. 로컬 도우미를 설치하지 않으면 이 과정은 일어나지 않습니다.
 - **음성 해설**은 브라우저와 운영체제에 내장된 음성을 사용합니다.
 

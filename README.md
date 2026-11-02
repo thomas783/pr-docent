@@ -205,6 +205,7 @@ Based on GitHub's 2026 Files changed page. If GitHub changes it, only `src/githu
 - Tests: `npm test` (Node's built-in test runner). They cover tour validation, checking against the diff, playback state, shortcuts, URL parsing, GitHub's file ID hash, line selectors, translations, the native messaging protocol and short scripts.
 - Publishing to npm: bump `package.json`'s version, merge, then run `npm publish --access public` from `main` (needs 2FA). A trusted-publishing workflow (`publish.yml`, triggered by an `npm-v<version>` tag) is ready, but don't push those tags until the trusted publisher is registered on npm.
 - Checking a tour: `node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]` (`gh pr diff <number> > pr.diff`)
+- Feedback: the toolbar popup (also **More → Send feedback** in the panel) posts to a Cloudflare Worker in `worker/` that opens a public issue here. It is deployed separately (`cd worker && npx wrangler@4 deploy`) with a fine-grained token limited to this repository's issues (`npx wrangler@4 secret put GITHUB_TOKEN`); to switch it off, revoke the token or disable the Worker.
 
 ## License
 
