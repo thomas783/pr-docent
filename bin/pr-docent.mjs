@@ -11,7 +11,7 @@
 // with a bare environment.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -159,8 +159,13 @@ function uninstall() {
   }
   const removed = manifests.filter((path) => existsSync(path));
   for (const path of removed) rmSync(path, { force: true });
-  rmSync(CONFIG_DIR, { recursive: true, force: true });
-  console.log(`Removed ${[CONFIG_DIR, ...removed].join(", ")}.`);
+  // The reviewer's own guidelines are theirs: keep them for a later install.
+  const kept = join(CONFIG_DIR, "guidelines.md");
+  for (const entry of existsSync(CONFIG_DIR) ? readdirSync(CONFIG_DIR) : []) {
+    if (join(CONFIG_DIR, entry) !== kept) rmSync(join(CONFIG_DIR, entry), { recursive: true, force: true });
+  }
+  if (!existsSync(kept)) rmSync(CONFIG_DIR, { recursive: true, force: true });
+  console.log(`Removed ${[CONFIG_DIR, ...removed].join(", ")}.${existsSync(kept) ? ` Kept your guidelines in ${kept}.` : ""}`);
 }
 
 function fail(message) {
