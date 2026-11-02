@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PR Docent</title>
+    <style>
+      body { margin: 0 auto; padding: 40px 20px 56px; max-width: 640px; font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; color: #1f2328; background: #fff; }
+      header { display: flex; align-items: center; gap: 12px; }
+      header img { width: 48px; height: 48px; }
+      h1 { margin: 0; font-size: 24px; }
+      h2 { margin: 28px 0 8px; font-size: 17px; }
+      p, li { color: #59636e; }
+      ol, ul { padding-left: 22px; }
+      li { margin: 6px 0; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; padding: 1px 5px; border-radius: 4px; background: #f6f8fa; }
+      a { color: #0969da; }
+      .demo { display: inline-block; margin-top: 4px; padding: 9px 18px; border-radius: 8px; background: #8250df; color: #fff; text-decoration: none; font-weight: 600; }
+      @media (prefers-color-scheme: dark) {
+        body { color: #f0f6fc; background: #0d1117; }
+        p, li { color: #9198a1; }
+        code { background: #151b23; }
+        a { color: #4493f8; }
+        .demo { color: #fff; }
+      }
+    </style>
+  </head>
+  <body>
+    <header><img src="icons/icon-128.png" alt="" /><h1 data-i18n="welcomeTitle"></h1></header>
+    <p data-i18n="welcomeIntro"></p>
+
+    <h2 data-i18n="welcomeTryTitle"></h2>
+    <ol>
+      <li data-i18n="welcomeTry1"></li>
+      <li data-i18n="welcomeTry2"></li>
+    </ol>
+    <a id="demo" class="demo" target="_blank" rel="noopener" data-i18n="welcomeDemo"></a>
+
+    <h2 data-i18n="welcomeOwnTitle"></h2>
+    <p data-i18n="welcomeOwnIntro"></p>
+    <ul>
+      <li><span data-i18n="welcomeActions"></span> <a id="actions-guide" target="_blank" rel="noopener" data-i18n="welcomeGuide"></a></li>
+      <li><span data-i18n="welcomeLocal"></span> <code>npx pr-docent install</code> <a id="local-guide" target="_blank" rel="noopener" data-i18n="welcomeGuide"></a></li>
+    </ul>
+
+    <h2 data-i18n="welcomeMoreTitle"></h2>
+    <p data-i18n="welcomeMore"></p>
+    <script type="module" src="src/welcome.js"></script>
+  </body>
+</html>
