@@ -9,10 +9,14 @@
 //   sentenceChars: 100
 //   ---
 //   Use the domain terms 원장, 안분 and 파생 라인. Always mark migrations as focus.
+//
+// A reviewer can keep their own guidelines, in the same format, in ~/.pr-docent/guidelines.md.
+// They apply to tours generated on their computer and win over the repository's.
 
 import { flattenSteps, splitSentences } from "./tour.js";
 
 export const GUIDELINES_PATH = ".github/pr-docent.md";
+export const PERSONAL_GUIDELINES_PATH = "~/.pr-docent/guidelines.md";
 
 export const DEFAULT_LIMITS = {
   maxSteps: null, // null: 3 + 1 per 25 changed lines, at most 20
@@ -23,9 +27,12 @@ export const DEFAULT_LIMITS = {
   chapterSummaryChars: 60,
 };
 
-/** { limits, instructions, errors } from the text of .github/pr-docent.md (or "" when absent). */
+/**
+ * { limits, settings, instructions, errors } from the text of .github/pr-docent.md (or "" when
+ * absent). settings holds only the limits the file sets.
+ */
 export function parseGuidelines(text) {
-  const limits = { ...DEFAULT_LIMITS };
+  const settings = {};
   const errors = [];
   const match = String(text ?? "").match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   for (const line of match ? match[1].split(/\r?\n/) : []) {
@@ -33,10 +40,21 @@ export function parseGuidelines(text) {
     const [, key, value] = line.replace(/\s+#.*$/, "").match(/^\s*(\w+)\s*:\s*(.*?)\s*$/) ?? [];
     if (!key || !(key in DEFAULT_LIMITS)) errors.push(`Unknown setting: ${line.trim()}`);
     else if (!/^\d+$/.test(value) || Number(value) < 1) errors.push(`${key} must be a positive whole number`);
-    else limits[key] = Number(value);
+    else settings[key] = Number(value);
   }
   const instructions = String(text ?? "").slice(match ? match[0].length : 0).trim();
-  return { limits, instructions, errors };
+  return { limits: { ...DEFAULT_LIMITS, ...settings }, settings, instructions, errors };
+}
+
+/** The limits when the repository's guidelines and then the reviewer's own both apply. */
+export function combinedLimits(guidelinesText = "", personalText = "") {
+  return { ...DEFAULT_LIMITS, ...parseGuidelines(guidelinesText).settings, ...parseGuidelines(personalText).settings };
+}
+
+/** Front matter that sets [limits], for the checker to read the same limits from one file. */
+export function limitsText(limits) {
+  const lines = Object.entries(limits).filter(([, value]) => value !== null).map(([key, value]) => `${key}: ${value}`);
+  return `---\n${lines.join("\n")}\n---\n`;
 }
 
 /** How many steps a tour of a diff with [changedLines] added or removed lines may have. */
@@ -80,8 +98,10 @@ export function checkBrevity(tour, { changedLines, limits = DEFAULT_LIMITS }) {
  * The generator's instructions: [template] (scripts/tour-prompt.md) with the paths, the limits
  * for this diff and the repository's own instructions filled in.
  */
-export function buildPrompt(template, { pr, out, tools, language, changedLines, guidelinesText = "" }) {
-  const { limits, instructions } = parseGuidelines(guidelinesText);
+export function buildPrompt(template, { pr, out, tools, language, changedLines, guidelinesText = "", personalText = "" }) {
+  const limits = combinedLimits(guidelinesText, personalText);
+  const { instructions } = parseGuidelines(guidelinesText);
+  const { instructions: personal } = parseGuidelines(personalText);
   const vars = {
     PR: pr,
     OUT: out,
@@ -94,9 +114,10 @@ export function buildPrompt(template, { pr, out, tools, language, changedLines, 
     POINT_CHARS: limits.pointChars,
     SUMMARY_CHARS: limits.summaryChars,
     CHAPTER_SUMMARY_CHARS: limits.chapterSummaryChars,
-    GUIDELINES: instructions
-      ? `## Repository guidelines (${GUIDELINES_PATH})\n\nThese come from the repository and take precedence over the rules above.\n\n${instructions}\n`
-      : "",
+    GUIDELINES: [
+      instructions && `## Repository guidelines (${GUIDELINES_PATH})\n\nThese come from the repository and take precedence over the rules above.\n\n${instructions}\n`,
+      personal && `## The reviewer's own guidelines (${PERSONAL_GUIDELINES_PATH})\n\nThese are the preferences of the reviewer this tour is for, and take precedence over the repository's guidelines and the rules above.\n\n${personal}\n`,
+    ].filter(Boolean).join("\n"),
   };
   return template.replace(/{{(\w+)}}/g, (match, name) => (name in vars ? String(vars[name]) : match));
 }

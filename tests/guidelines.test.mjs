@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildPrompt, checkBrevity, DEFAULT_LIMITS, parseGuidelines, stepBudget } from "../src/guidelines.js";
+import { buildPrompt, checkBrevity, combinedLimits, DEFAULT_LIMITS, limitsText, parseGuidelines, stepBudget } from "../src/guidelines.js";
 import { parseTour } from "../src/tour.js";
 
 const tourOf = (steps, extra = {}) =>
@@ -17,7 +17,7 @@ describe("parseGuidelines", () => {
   });
 
   it("treats text without front matter as instructions only", () => {
-    assert.deepEqual(parseGuidelines("Just prose.\n"), { limits: DEFAULT_LIMITS, instructions: "Just prose.", errors: [] });
+    assert.deepEqual(parseGuidelines("Just prose.\n"), { limits: DEFAULT_LIMITS, settings: {}, instructions: "Just prose.", errors: [] });
     assert.equal(parseGuidelines(undefined).instructions, "");
   });
 
@@ -74,9 +74,31 @@ describe("buildPrompt", () => {
     assert.equal(buildPrompt("{{LANGUAGE}}", { ...base, language: "a|b&c $& $1" }), "a|b&c $& $1");
   });
 
+  it("lets the reviewer's own guidelines win over the repository's", () => {
+    const prompt = buildPrompt(template, {
+      ...base,
+      guidelinesText: "---\nmaxSteps: 4\nsentenceChars: 90\n---\n마이그레이션은 중요로.",
+      personalText: "---\nmaxSteps: 2\n---\nAlways write in English.",
+    });
+    assert.match(prompt, /^o\/r#1 2 90/); // the reviewer's maxSteps, the repository's sentenceChars
+    assert.ok(prompt.indexOf("## Repository guidelines") < prompt.indexOf("## The reviewer's own guidelines"));
+    assert.match(prompt, /## The reviewer's own guidelines \(~\/\.pr-docent\/guidelines\.md\)[\s\S]*Always write in English\./);
+  });
+
   it("applies the repository's limits and appends its instructions", () => {
     const prompt = buildPrompt(template, { ...base, guidelinesText: "---\nmaxSteps: 4\n---\n마이그레이션은 집중으로." });
     assert.match(prompt, /^o\/r#1 4 80/);
     assert.match(prompt, /## Repository guidelines \(\.github\/pr-docent\.md\)[\s\S]*마이그레이션은 집중으로\./);
+  });
+});
+
+describe("combinedLimits and limitsText", () => {
+  it("merges the files' settings over the defaults and writes them back as front matter", () => {
+    const limits = combinedLimits("---\nmaxSteps: 4\n---\n", "---\nsentencesPerStep: 2\n---\n");
+    assert.equal(limits.maxSteps, 4);
+    assert.equal(limits.sentencesPerStep, 2);
+    assert.equal(limits.sentenceChars, DEFAULT_LIMITS.sentenceChars);
+    assert.deepEqual(parseGuidelines(limitsText(limits)).limits, limits);
+    assert.doesNotMatch(limitsText(DEFAULT_LIMITS), /maxSteps/);
   });
 });
