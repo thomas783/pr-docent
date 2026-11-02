@@ -26,7 +26,7 @@ PR Docent takes you on a tour of a GitHub pull request, right on the Files chang
 
 A large pull request is a long list of files in alphabetical order. PR Docent breaks it into chapters and walks through the files and lines in the order to read them: it scrolls to each step, frames the lines, fades the rest of the diff, and reads out what to look at.
 
-• Steps marked Focus, Skim or Skippable, and a button that jumps straight to the next Focus step
+• Steps marked Key, Skim or Skippable, and a button that jumps straight to the next key step
 • Narration with your browser's built-in voices, pointing at the lines each sentence talks about
 • Review points: what to check at each step
 • Files the tour doesn't cover, so nothing is missed by trusting it
@@ -50,7 +50,7 @@ PR Docent는 GitHub 풀 리퀘스트의 Files changed 화면에서 리뷰 투어
 
 큰 PR은 알파벳 순서로 늘어선 긴 파일 목록입니다. PR Docent는 PR을 챕터로 나누고, 읽어야 할 순서대로 파일과 줄을 따라갑니다. 단계마다 해당 줄로 스크롤해 테두리를 두르고, 나머지 diff는 흐리게 하고, 무엇을 봐야 하는지 읽어 줍니다.
 
-• 단계별 중요도(집중, 훑기, 생략 가능)와 다음 집중 단계로 바로 건너뛰는 버튼
+• 단계별 중요도(중요, 참고, 생략 가능)와 다음 중요 단계로 바로 건너뛰는 버튼
 • 브라우저 내장 음성으로 설명을 읽고, 문장마다 해당 줄을 가리킴
 • 리뷰 포인트: 단계마다 확인할 점
 • 투어가 다루지 않은 파일 목록: 투어만 믿고 놓치는 파일이 없게 함

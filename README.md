@@ -24,10 +24,10 @@ Tours and shorts are written by Claude Code, either in GitHub Actions or on your
 
 ## Features
 
-- Chapters, progress, previous / play / next, **skip between focus steps**, keyboard shortcuts
+- Chapters, progress, previous / play / next, **skip between key steps**, keyboard shortcuts
 - Scrolls to each step's file and lines and frames them, leaving GitHub's green and red for added and removed lines visible; the rest of the diff fades.
 - Points at the lines each sentence talks about while it is read (when `note` is a list of sentences).
-- Importance per step: **focus** (read carefully), **skim**, **skippable**
+- Importance per step: **key** (read carefully), **skim**, **skippable** (`focus`, `skim` and `skip` in the tour file)
 - Reads notes aloud with the browser's built-in speech synthesis (adjustable speed). No network requests, no cost.
 - **Files the tour doesn't cover**, so nothing is missed by trusting the tour.
 - Expands large diffs that GitHub collapses ("Load Diff").
@@ -45,7 +45,7 @@ GitHub's diff view already uses the arrow keys and single letters, so PR Docent 
 | Keys | Action |
 |---|---|
 | `Alt` + `→` / `←` | Next / previous step |
-| `Alt` + `↓` / `↑` | Skip to the next / previous **focus** step |
+| `Alt` + `↓` / `↑` | Skip to the next / previous **key** step |
 | `Alt` + `P` | Play / pause |
 
 ## Try it
@@ -167,7 +167,7 @@ The file is read from the pull request's head commit, so a pull request that cha
 
 - A tour posted in the pull request's comments is loaded automatically. A tour you generated locally takes precedence.
 - A file named `tours/<owner>--<repo>--<number>.json` is loaded for that pull request.
-- Example: [`tours/thomas783--pr-docent--1.json`](tours/thomas783--pr-docent--1.json) tours this repository's [PR #1](https://github.com/thomas783/pr-docent/pull/1/changes) (keyboard shortcuts and skipping between focus steps). With the extension installed, open that pull request to review PR Docent's own change with PR Docent.
+- Example: [`tours/thomas783--pr-docent--1.json`](tours/thomas783--pr-docent--1.json) tours this repository's [PR #1](https://github.com/thomas783/pr-docent/pull/1/changes) (keyboard shortcuts and skipping between key steps). With the extension installed, open that pull request to review PR Docent's own change with PR Docent.
 - Tours you put in that folder are loaded automatically and are not committed (see `.gitignore`); only public examples are committed.
 
 ## Tour format (version 1)
