@@ -5,7 +5,7 @@
 // private repositories).
 
 import { visibleLines } from "./diff.js";
-import { GUIDELINES_PATH } from "./guidelines.js";
+import { GUIDELINES_PATH, PERSONAL_GUIDELINES_KEY } from "./guidelines.js";
 
 const HOST_NAME = "dev.prdocent.host";
 const MAX_FILE_BYTES = 1_000_000;
@@ -33,8 +33,10 @@ async function generate(port, { pr, title, body, headSha, language }) {
   const { base, diff, files } = await collect(port, pr, headSha);
   // The repository's own instructions for tours, if it has any.
   const guidelines = await fetchText(`${base}/raw/${headSha}/${GUIDELINES_PATH}`).catch(() => "");
+  // The reviewer's own, from the settings page.
+  const personal = (await chrome.storage.local.get(PERSONAL_GUIDELINES_KEY))[PERSONAL_GUIDELINES_KEY] ?? "";
   port.postMessage({ type: "progress", stage: "claude", seconds: 0 });
-  relay(port, { type: "generate", pr, title, body, headSha, diff, files, guidelines, language });
+  relay(port, { type: "generate", pr, title, body, headSha, diff, files, guidelines, personal, language });
 }
 
 async function script(port, { pr, title, body, headSha, tour, language }) {

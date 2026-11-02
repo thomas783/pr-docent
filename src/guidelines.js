@@ -10,13 +10,16 @@
 //   ---
 //   Use the domain terms 원장, 안분 and 파생 라인. Always mark migrations as focus.
 //
-// A reviewer can keep their own guidelines, in the same format, in ~/.pr-docent/guidelines.md.
-// They apply to tours generated on their computer and win over the repository's.
+// A reviewer can keep their own guidelines, in the same format, in the extension's settings page
+// or in ~/.pr-docent/guidelines.md. They apply to tours generated on their computer and win over
+// the repository's.
 
 import { flattenSteps, splitSentences } from "./tour.js";
 
 export const GUIDELINES_PATH = ".github/pr-docent.md";
 export const PERSONAL_GUIDELINES_PATH = "~/.pr-docent/guidelines.md";
+// Where the extension's settings page keeps the reviewer's guidelines (they win over the file).
+export const PERSONAL_GUIDELINES_KEY = "prdocent:guidelines";
 
 export const DEFAULT_LIMITS = {
   maxSteps: null, // null: 3 + 1 per 25 changed lines, at most 20

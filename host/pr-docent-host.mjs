@@ -61,13 +61,15 @@ function reveal(path) {
   return new Promise((done) => execFile("open", ["-R", path], () => done()));
 }
 
-async function generate({ pr, title, body, headSha, diff, files, guidelines = "", model, language }) {
+async function generate({ pr, title, body, headSha, diff, files, guidelines = "", personal: fromSettings = "", model, language }) {
   const { work, repo, out } = prepareWorkspace({ files, diff, title, body, headSha });
   try {
-    // The reviewer's own guidelines, kept on this computer and applied after the repository's.
+    // The reviewer's own guidelines, applied after the repository's: from the extension's settings
+    // page, or else from ~/.pr-docent/guidelines.md.
     const personalPath = join(homedir(), ".pr-docent", "guidelines.md");
-    const personal = existsSync(personalPath) ? readFileSync(personalPath, "utf8") : "";
-    for (const [name, text] of [[".github/pr-docent.md", guidelines], ["~/.pr-docent/guidelines.md", personal]]) {
+    const personal = fromSettings.trim() ? fromSettings : existsSync(personalPath) ? readFileSync(personalPath, "utf8") : "";
+    const personalName = fromSettings.trim() ? "PR Docent settings (your guidelines)" : "~/.pr-docent/guidelines.md";
+    for (const [name, text] of [[".github/pr-docent.md", guidelines], [personalName, personal]]) {
       const { errors } = parseGuidelines(text);
       if (errors.length) throw new Error(`${name}: ${errors.join(" / ")}`);
     }
