@@ -19,6 +19,11 @@ async function render() {
   return language;
 }
 
+document.getElementById("open-options").addEventListener("click", (event) => {
+  event.preventDefault();
+  chrome.runtime.openOptionsPage();
+});
+
 const FEEDBACK_ERRORS = { "too-short": "feedbackTooShort", "too-long": "feedbackTooLong", "rate-limited": "feedbackRateLimited", network: "feedbackNetwork" };
 
 document.getElementById("feedback-send").addEventListener("click", async (event) => {

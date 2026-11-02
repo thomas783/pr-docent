@@ -5,10 +5,11 @@
 
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { changedLineCount, checkTour, visibleLines } from "../src/diff.js";
-import { buildPrompt, checkBrevity, parseGuidelines } from "../src/guidelines.js";
+import { buildPrompt, checkBrevity, combinedLimits, limitsText, parseGuidelines } from "../src/guidelines.js";
 import { parseTour } from "../src/tour.js";
 import { prepareWorkspace, runClaude, stopClaude } from "./claude.mjs";
 import { createDecoder, encodeMessage } from "./native.mjs";
@@ -60,12 +61,21 @@ function reveal(path) {
   return new Promise((done) => execFile("open", ["-R", path], () => done()));
 }
 
-async function generate({ pr, title, body, headSha, diff, files, guidelines = "", model, language }) {
+async function generate({ pr, title, body, headSha, diff, files, guidelines = "", personal: fromSettings = "", model, language }) {
   const { work, repo, out } = prepareWorkspace({ files, diff, title, body, headSha });
   try {
-    if (guidelines) writeFileSync(join(out, "guidelines.md"), guidelines);
-    const { limits, errors: guidelineErrors } = parseGuidelines(guidelines);
-    if (guidelineErrors.length) throw new Error(`.github/pr-docent.md: ${guidelineErrors.join(" / ")}`);
+    // The reviewer's own guidelines, applied after the repository's: from the extension's settings
+    // page, or else from ~/.pr-docent/guidelines.md.
+    const personalPath = join(homedir(), ".pr-docent", "guidelines.md");
+    const personal = fromSettings.trim() ? fromSettings : existsSync(personalPath) ? readFileSync(personalPath, "utf8") : "";
+    const personalName = fromSettings.trim() ? "PR Docent settings (your guidelines)" : "~/.pr-docent/guidelines.md";
+    for (const [name, text] of [[".github/pr-docent.md", guidelines], [personalName, personal]]) {
+      const { errors } = parseGuidelines(text);
+      if (errors.length) throw new Error(`${name}: ${errors.join(" / ")}`);
+    }
+    const limits = combinedLimits(guidelines, personal);
+    // The checker Claude runs reads its limits from this file: give it the combined ones.
+    writeFileSync(join(out, "guidelines.md"), limitsText(limits));
     const changedLines = changedLineCount(diff);
 
     const prRef = `${pr.owner}/${pr.repo}#${pr.number}`;
@@ -76,6 +86,7 @@ async function generate({ pr, title, body, headSha, diff, files, guidelines = ""
       language: language || "한국어",
       changedLines,
       guidelinesText: guidelines,
+      personalText: personal,
     });
     await runClaude(prompt, repo, [
       "--model", model || "claude-opus-5-5",

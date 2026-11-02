@@ -25,6 +25,7 @@ const files = [
   ...["_locales", "src", "icons"].flatMap(tracked),
   ...git("ls-files", "--", "tours/*.json"),
   "popup.html",
+  "options.html",
   "player.html",
   "LICENSE",
 ];
@@ -43,6 +44,7 @@ const referenced = [
   ...Object.values(storeManifest.icons ?? {}),
   ...Object.values(storeManifest.action?.default_icon ?? {}),
   storeManifest.action?.default_popup,
+  storeManifest.options_ui?.page,
   storeManifest.background?.service_worker,
   ...(storeManifest.content_scripts ?? []).flatMap((script) => script.js ?? []),
 ].filter(Boolean);
