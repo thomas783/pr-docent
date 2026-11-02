@@ -4,7 +4,16 @@
 
 GitHub 풀 리퀘스트를 안내하는 도슨트 역할의 Chrome 확장입니다. **Files changed** 화면에서 리뷰어에게 변경 사항의 **투어**를 안내합니다. 수천 줄짜리 PR을 챕터로 나누고, **읽을 순서대로** 해당 파일과 줄로 이동하며 테두리로 표시하고, 볼 곳을 음성으로 읽어 줍니다. 코드를 읽지 않는 팀원을 위해서는 30~45초 동안 그림으로 설명하는 **쇼츠**도 재생합니다.
 
-> 상태: 개발 중. Chrome 웹 스토어에는 아직 없으며 개발자 모드로 설치합니다. 투어와 쇼츠는 GitHub Actions나 본인 컴퓨터의 Claude Code가 작성합니다.
+**[Chrome 웹 스토어에서 설치](https://chromewebstore.google.com/detail/pr-docent/deejphpcfjilekklajdhdhfepjbenjii)** · [데모 PR에서 바로 체험해 보기](#바로-체험해-보기)
+
+투어와 쇼츠는 GitHub Actions나 본인 컴퓨터의 Claude Code가 작성합니다.
+
+![PR의 Files changed 화면에서 재생 중인 투어: 패널에 단계 설명, 리뷰 포인트, 조작 버튼이 있고 diff에서는 그 단계의 줄에 테두리가 둘러져 있습니다](store/screenshots/ko-1-tour.png)
+
+<p>
+  <img src="store/screenshots/ko-2-narration.png" width="49%" alt="읽고 있는 문장이 가리키는 줄에 테두리를 두르는 음성 해설">
+  <img src="store/screenshots/ko-3-short.png" width="49%" alt="변경 내용을 그림으로 설명하는 쇼츠">
+</p>
 
 | 용어 | 뜻 |
 |---|---|
@@ -48,11 +57,14 @@ PR Docent를 체험할 수 있는 데모 PR 두 개를 열어 두었습니다. �
 
 두 PR은 데모 코드가 있는 `demo/base` 브랜치를 대상으로 하며, `main`에는 머지하지 않습니다.
 
-## 설치 (개발용)
+## 설치
+
+**[Chrome 웹 스토어에서 PR Docent](https://chromewebstore.google.com/detail/pr-docent/deejphpcfjilekklajdhdhfepjbenjii)** 를 설치한 뒤 PR의 Files changed 탭을 열면, 오른쪽 아래에 **PR Docent** 버튼이 나타납니다. GitHub Actions가 올린 투어는 바로 재생되고, 본인 컴퓨터에서 투어를 만들려면 [로컬 도우미](#투어-로컬-생성-본인-claude-code)도 설정합니다.
+
+이 레포의 코드로 직접 실행하려면(개발용):
 
 1. `chrome://extensions`에서 **개발자 모드**를 켭니다.
 2. **압축해제된 확장 프로그램을 로드합니다**를 누르고 이 폴더를 선택합니다.
-3. PR의 Files changed 탭을 열면 오른쪽 아래에 **PR Docent** 버튼이 나타납니다.
 
 ## 투어 자동 생성 (GitHub Actions)
 
