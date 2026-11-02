@@ -26,6 +26,7 @@ const files = [
   ...git("ls-files", "--", "tours/*.json"),
   "popup.html",
   "options.html",
+  "welcome.html",
   "player.html",
   "LICENSE",
 ];

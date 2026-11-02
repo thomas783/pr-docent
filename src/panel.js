@@ -5,6 +5,7 @@
 import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, fetchPullRequestRevision, focusStep, markViewed, openStepComment, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
+import { DEMO_PULLS, GUIDES, isDemoPull } from "./links.js";
 import { svg } from "./icons.js";
 import { Player } from "./player.js";
 import { actionForKey, SHORTCUT_HELP } from "./shortcuts.js";
@@ -426,13 +427,19 @@ export class TourPanel {
 
   draw() {
     if (!this.player) {
+      // No tour yet: the ways to get one, and the demo to see what a tour is like.
+      const language = resolveLanguage(this.settings.language, navigator.language);
+      const link = (href, key) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(this.t(key))}</a>`;
       this.panel.innerHTML = `
         ${this.header()}
         <div class="content">
-          <p class="muted">${esc(this.t("noTour"))}</p>
-          ${this.generateButton()}
-          ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
-          ${this.setupGuide()}
+          <p>${esc(this.t("noTour"))}</p>
+          <div class="way"><b>${esc(this.t("wayLocal"))}</b><p class="muted">${esc(this.t("wayLocalNote"))}</p>
+            ${this.generateButton()}
+            ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
+            ${this.setupGuide()}</div>
+          <div class="way"><b>${esc(this.t("wayActions"))}</b><p class="muted">${esc(this.t("wayActionsNote"))} ${link(GUIDES[language].actions, "guideLink")}</p></div>
+          ${isDemoPull(this.pr) ? "" : `<div class="way"><b>${esc(this.t("wayDemo"))}</b><p>${link(DEMO_PULLS[language], "wayDemoLink")}</p></div>`}
         </div>`;
       return this.bind();
     }
@@ -734,6 +741,8 @@ const STYLES = `
   p { margin: 4px 0; }
   .muted { color: var(--fgColor-muted, #59636e); }
   .status { color: var(--fgColor-attention, #9a6700); }
+  .way { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--borderColor-muted, #d1d9e0b3); }
+  .way p { margin: 2px 0 6px; }
   .setup { margin: 8px 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
   .setup p { margin: 0 0 4px; }
   .setup ol { margin: 4px 0; padding-left: 18px; }

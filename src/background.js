@@ -12,6 +12,11 @@ const MAX_FILE_BYTES = 1_000_000;
 
 const HANDLERS = { generate, script, render, reveal };
 
+// Right after installing (not on updates), a page with the demo pull request to try PR Docent on.
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+});
+
 // The panel's "Send feedback": the toolbar popup, or the same page in a tab where it can't open.
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== "openFeedback") return;
