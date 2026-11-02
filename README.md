@@ -163,6 +163,10 @@ chapterSummaryChars: 60
 
 The file is read from the pull request's head commit, so a pull request that changes the rules is toured with the new rules.
 
+### Your own guidelines (`~/.pr-docent/guidelines.md`)
+
+Put guidelines in the same format in `~/.pr-docent/guidelines.md` to apply them to every tour generated on your computer, without committing anything to the repository: for example how short you like tours, or what to always point out. They come after the repository's guidelines and win over them, limits included. They don't apply to tours from GitHub Actions, and `npx pr-docent uninstall` keeps the file.
+
 ## Loading tours
 
 - A tour posted in the pull request's comments is loaded automatically. A tour you generated locally takes precedence.
