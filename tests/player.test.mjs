@@ -13,6 +13,20 @@ const { tour } = parseTour({
 });
 
 describe("Player", () => {
+  it("knows when a step is the tour's last in its file", () => {
+    const { tour: twice } = parseTour({
+      version: 1,
+      pr: { owner: "o", repo: "r", number: 1 },
+      chapters: [{ title: "A", steps: [{ file: "a" }, { file: "b" }, { file: "a" }] }],
+    });
+    const player = new Player(twice);
+    assert.equal(player.isLastInFile, false); // a comes back in step 3
+    player.next();
+    assert.equal(player.isLastInFile, true);
+    player.next();
+    assert.equal(player.isLastInFile, true);
+  });
+
   it("walks forward and back across chapters", () => {
     const player = new Player(tour);
     assert.equal(player.current.file, "a1");

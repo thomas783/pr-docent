@@ -24,6 +24,11 @@ export class Player {
     return this.index === this.steps.length - 1;
   }
 
+  /** True when no later step of the tour is in the current step's file: the file is done after it. */
+  get isLastInFile() {
+    return !this.steps.slice(this.index + 1).some((step) => step.file === this.current.file);
+  }
+
   /** True when the current step opens its chapter (narration introduces the chapter there). */
   get startsChapter() {
     return this.current.stepIndex === 0;
