@@ -33,7 +33,7 @@ A large pull request is a long list of files in alphabetical order. PR Docent br
 • "Done, next" marks each file Viewed on GitHub as the tour finishes it
 • Files the tour doesn't cover, so nothing is missed by trusting it
 • Shorts: a 30–45 second explanation in pictures for teammates who won't read the code, played right on the page
-• Keyboard shortcuts (Alt + arrows, Alt + P)
+• Keyboard shortcuts (Alt + arrows, Alt + P, Alt + V)
 • English and Korean
 
 Where tours come from
@@ -59,7 +59,7 @@ PR Docent는 GitHub 풀 리퀘스트의 Files changed 화면에서 리뷰 투어
 • "다 봤음, 다음": 투어가 끝난 파일을 GitHub에서 Viewed로 표시
 • 투어가 다루지 않은 파일 목록: 투어만 믿고 놓치는 파일이 없게 함
 • 쇼츠: 코드를 읽지 않는 팀원을 위한 30~45초짜리 그림 설명을 페이지 위에서 바로 재생
-• 단축키 (Alt + 방향키, Alt + P)
+• 단축키 (Alt + 방향키, Alt + P, Alt + V)
 • 영어와 한국어 지원
 
 투어를 만드는 방법
