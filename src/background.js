@@ -12,6 +12,15 @@ const MAX_FILE_BYTES = 1_000_000;
 
 const HANDLERS = { generate, script, render, reveal };
 
+// The panel's "Send feedback": the toolbar popup, or the same page in a tab where it can't open.
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== "openFeedback") return;
+  // openPopup() is missing before Chrome 127 and fails without a focused window.
+  Promise.resolve()
+    .then(() => chrome.action.openPopup())
+    .catch(() => chrome.tabs.create({ url: chrome.runtime.getURL("popup.html#feedback") }));
+});
+
 chrome.runtime.onConnect.addListener((port) => {
   const handler = HANDLERS[port.name];
   if (!handler) return;

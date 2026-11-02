@@ -205,6 +205,7 @@ GitHub의 2026년 Files changed 화면 기준입니다. 화면 구조가 바뀌�
 - 테스트: `npm test` (Node 내장 테스트 러너). 투어 검증, diff 대조, 재생 상태, 단축키, PR 주소 해석, GitHub 파일 ID 해시, 줄 선택자, 번역, Native Messaging 통신, 쇼츠 대본을 다룹니다.
 - npm 게시: `package.json`의 버전을 올려 머지한 뒤 main에서 `npm publish --access public`(2FA 필요). GitHub Actions의 trusted publishing 워크플로(`publish.yml`, `npm-v<버전>` 태그로 실행)는 준비되어 있지만, npm 쪽 trusted publisher 등록이 끝나기 전에는 태그를 푸시하지 않습니다.
 - 투어 검사: `node scripts/check-tour.mjs <tour.json> <pr.diff> [owner/repo#number]` (`gh pr diff <number> > pr.diff`)
+- 피드백: 툴바 팝업(패널의 **더 보기 → 피드백 보내기**로도 열림)이 `worker/`의 Cloudflare Worker로 보내고, Worker가 이 레포에 공개 이슈를 만듭니다. Worker는 따로 배포하며(`cd worker && npx wrangler@4 deploy`), 이 레포의 이슈 권한만 있는 fine-grained 토큰을 씁니다(`npx wrangler@4 secret put GITHUB_TOKEN`). 끄려면 토큰을 폐기하거나 Worker를 비활성화합니다.
 
 ## 라이선스
 

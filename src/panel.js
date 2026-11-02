@@ -472,6 +472,7 @@ export class TourPanel {
       ${this.short ? item("video", this.t("saveVideo")) : ""}
       ${this.videoPath ? `<button class="item" data-action="reveal">${esc(this.t("showInFinder"))}</button>` : ""}
       ${tour.skipped.length ? `<details><summary>${esc(this.t("skippedFiles", tour.skipped.length))}</summary><ul>${tour.skipped.map((s) => `<li>${esc(s.file)}<small>${esc(s.reason)}</small></li>`).join("")}</ul></details>` : ""}
+      <button class="item" data-action="feedback">${esc(this.t("feedbackOpen"))}</button>
       <details><summary>${esc(this.t("shortcuts"))}</summary><dl class="shortcuts">${SHORTCUT_HELP.map(([keys, what]) => `<dt>${esc(keys)}</dt><dd>${esc(this.t(what))}</dd>`).join("")}</dl></details>
     </div>`;
   }
@@ -567,6 +568,11 @@ export class TourPanel {
     });
     on("generate", "click", () => this.generate());
     on("copySetup", "click", () => this.copySetup());
+    on("feedback", "click", () => {
+      this.menuOpen = false;
+      this.render();
+      if (this.connected()) chrome.runtime.sendMessage({ type: "openFeedback" });
+    });
     on("short", "click", () => this.makeShort());
     on("video", "click", () => this.saveVideo());
     on("reveal", "click", () => this.videoPath && revealFile(this.videoPath).catch(() => {}));

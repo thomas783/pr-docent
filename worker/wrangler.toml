@@ -1,0 +1,24 @@
+# PR Docent feedback relay (Cloudflare Worker): turns the extension's feedback form into a GitHub
+# issue. Deployed separately; not part of the extension or the npm package.
+# Deploy:  npx wrangler@4 deploy                    (from this folder)
+# Secret:  npx wrangler@4 secret put GITHUB_TOKEN
+#          fine-grained PAT scoped to thomas783/pr-docent, Issues: Read and write only
+name = "pr-docent-feedback"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+preview_urls = false
+
+[vars]
+GITHUB_REPO = "thomas783/pr-docent"
+# Comma-separated: the Chrome Web Store release and the unpacked development install.
+ALLOWED_ORIGINS = "chrome-extension://deejphpcfjilekklajdhdhfepjbenjii,chrome-extension://hleefogoiedjahnmjgmmgonckaeicppc"
+
+# 3 submissions per IP per minute.
+[[ratelimits]]
+name = "FEEDBACK_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 3
+  period = 60

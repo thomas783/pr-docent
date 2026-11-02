@@ -40,7 +40,7 @@ Where tours come from
 
 Try it on the demo pull request: https://github.com/thomas783/pr-docent/pull/22/changes
 
-PR Docent has no server. It doesn't collect, sell or send your data anywhere; tours are kept in Chrome on your computer. Setup and source: https://github.com/thomas783/pr-docent
+PR Docent doesn't collect or sell your data; tours are kept in Chrome on your computer. The only thing sent to the developer is feedback you choose to send from the toolbar popup, which becomes a public GitHub issue. Setup and source: https://github.com/thomas783/pr-docent
 ```
 
 ### Description (Korean)
@@ -64,7 +64,7 @@ PR Docent는 GitHub 풀 리퀘스트의 Files changed 화면에서 리뷰 투어
 
 데모 PR에서 바로 체험해 보세요: https://github.com/thomas783/pr-docent/pull/23/changes
 
-PR Docent는 서버가 없습니다. 데이터를 수집하거나 판매하거나 외부로 보내지 않으며, 투어는 사용자 컴퓨터의 Chrome에 저장됩니다. 설치 방법과 소스: https://github.com/thomas783/pr-docent
+PR Docent는 데이터를 수집하거나 판매하지 않으며, 투어는 사용자 컴퓨터의 Chrome에 저장됩니다. 개발자에게 가는 것은 툴바 팝업에서 직접 보내는 피드백뿐이며, 공개 GitHub 이슈로 올라갑니다. 설치 방법과 소스: https://github.com/thomas783/pr-docent
 ```
 
 ### Regenerating the screenshots
@@ -98,7 +98,7 @@ No, I am not using remote code. (All scripts are in the package; the extension l
 
 ### Data usage
 
-Check **Website content** only. It is read to provide the extension's single purpose and, only when the user clicks a generate button, passed to the local helper on the user's computer, which sends it to Anthropic through the user's own Claude Code account. Nothing goes to the developer.
+Check **Website content** only. It is read to provide the extension's single purpose and, only when the user clicks a generate button, passed to the local helper on the user's computer, which sends it to Anthropic through the user's own Claude Code account. Nothing else goes to the developer, except the optional feedback form (from 0.1.2): text the user types and sends on purpose, which becomes a public GitHub issue through the relay in `worker/`. It is described in the privacy policy.
 
 Then certify all three:
 - I do not sell or transfer user data to third parties, outside of the approved use cases
