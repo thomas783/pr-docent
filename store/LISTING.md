@@ -29,14 +29,16 @@ A large pull request is a long list of files in alphabetical order. PR Docent br
 • Steps marked Key, Skim or Skippable, and a button that jumps straight to the next key step
 • Narration with your browser's built-in voices, pointing at the lines each sentence talks about
 • Review points: what to check at each step
+• Comment on a step's lines with GitHub's own comment form, drafted with the review point
+• "Done, next" marks each file Viewed on GitHub as the tour finishes it
 • Files the tour doesn't cover, so nothing is missed by trusting it
 • Shorts: a 30–45 second explanation in pictures for teammates who won't read the code, played right on the page
-• Keyboard shortcuts (Alt + arrows, Alt + P)
+• Keyboard shortcuts (Alt + arrows, Alt + P, Alt + V)
 • English and Korean
 
 Where tours come from
 • GitHub Actions: add one workflow and Claude Code writes a tour (and a short) for every pull request and posts it as a comment. The extension loads it automatically, with your own GitHub session, so private repositories work too.
-• Your computer: run `npx pr-docent install` once, then click "Create a tour with local Claude Code" in the panel. It uses your own Claude Code and subscription, with no API key.
+• Your computer: run `npx pr-docent install` once, then click "Create a tour with local Claude Code" in the panel. It uses your own Claude Code and subscription, with no API key. Your own guidelines for these tours can be set in PR Docent's settings.
 
 Try it on the demo pull request: https://github.com/thomas783/pr-docent/pull/22/changes
 
@@ -53,14 +55,16 @@ PR Docent는 GitHub 풀 리퀘스트의 Files changed 화면에서 리뷰 투어
 • 단계별 중요도(중요, 참고, 생략 가능)와 다음 중요 단계로 바로 건너뛰는 버튼
 • 브라우저 내장 음성으로 설명을 읽고, 문장마다 해당 줄을 가리킴
 • 리뷰 포인트: 단계마다 확인할 점
+• 단계의 줄에 GitHub 코멘트 창을 바로 열고, 리뷰 포인트를 초안으로 채움
+• "다 봤음, 다음": 투어가 끝난 파일을 GitHub에서 Viewed로 표시
 • 투어가 다루지 않은 파일 목록: 투어만 믿고 놓치는 파일이 없게 함
 • 쇼츠: 코드를 읽지 않는 팀원을 위한 30~45초짜리 그림 설명을 페이지 위에서 바로 재생
-• 단축키 (Alt + 방향키, Alt + P)
+• 단축키 (Alt + 방향키, Alt + P, Alt + V)
 • 영어와 한국어 지원
 
 투어를 만드는 방법
 • GitHub Actions: 워크플로 하나를 추가하면 PR마다 Claude Code가 투어와 쇼츠를 써서 코멘트로 올립니다. 확장은 사용자 본인의 GitHub 세션으로 이를 자동으로 불러오므로 비공개 레포에서도 동작합니다.
-• 내 컴퓨터: `npx pr-docent install`을 한 번 실행한 뒤, 패널에서 "로컬 Claude Code로 투어 생성"을 누릅니다. 본인의 Claude Code와 구독을 쓰므로 API 키가 필요 없습니다.
+• 내 컴퓨터: `npx pr-docent install`을 한 번 실행한 뒤, 패널에서 "로컬 Claude Code로 투어 생성"을 누릅니다. 본인의 Claude Code와 구독을 쓰므로 API 키가 필요 없습니다. 이렇게 만드는 투어에 적용할 개인 지침은 PR Docent 설정에서 정할 수 있습니다.
 
 데모 PR에서 바로 체험해 보세요: https://github.com/thomas783/pr-docent/pull/23/changes
 
