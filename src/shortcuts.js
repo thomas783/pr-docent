@@ -8,6 +8,7 @@ const ACTIONS = {
   ArrowDown: "nextFocus",
   ArrowUp: "previousFocus",
   KeyP: "toggle",
+  KeyV: "done",
 };
 
 /** The tour action for a keydown event, or null when it isn't one of ours. */
@@ -30,4 +31,5 @@ export const SHORTCUT_HELP = [
   ["Alt + → / ←", "shortcutStep"],
   ["Alt + ↓ / ↑", "shortcutFocus"],
   ["Alt + P", "shortcutPlay"],
+  ["Alt + V", "shortcutDone"],
 ];

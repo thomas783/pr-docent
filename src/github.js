@@ -140,6 +140,20 @@ async function unmarkViewed(fileId) {
   if (!hasRows()) await expandFile(fileId);
 }
 
+/**
+ * Marks [file] as Viewed on GitHub, as its own toggle does (GitHub then collapses it). Resolves to
+ * false when the file or its toggle isn't on the page.
+ */
+export async function markViewed(file) {
+  const fileId = `diff-${await sha256Hex(file)}`;
+  if (viewedButton(fileId)) return true;
+  const toggle = [...(document.getElementById(fileId)?.querySelectorAll('button[aria-pressed="false"]') ?? [])].find((b) => b.textContent.trim() === "Viewed");
+  if (!toggle) return false;
+  toggle.click();
+  await waitFor(() => viewedButton(fileId), 2000);
+  return Boolean(viewedButton(fileId));
+}
+
 /** Opens a collapsed file. */
 async function expandFile(fileId) {
   const toggle = [...(document.getElementById(fileId)?.querySelectorAll("button") ?? [])].find((b) => buttonName(b) === "Expand file");

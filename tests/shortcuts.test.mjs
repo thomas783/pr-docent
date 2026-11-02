@@ -12,6 +12,7 @@ describe("actionForKey", () => {
     assert.equal(actionForKey(key("ArrowUp")), "previousFocus");
     // Option+P types "π" on macOS; the code is still KeyP.
     assert.equal(actionForKey(key("KeyP", { key: "π" })), "toggle");
+    assert.equal(actionForKey(key("KeyV", { key: "√" })), "done");
   });
 
   it("leaves GitHub's own keys alone", () => {

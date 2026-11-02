@@ -2,7 +2,7 @@
 // GitHub's CSS and ours never collide. It owns playback: focusing steps on the page,
 // narrating them, and advancing while playing.
 
-import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, fetchPullRequestRevision, focusStep, listPullRequestFiles, parsePullRequestPath } from "./github.js";
+import { clearHighlight, emphasize, fetchCommentData, fetchPullRequestDetails, fetchPullRequestRevision, focusStep, markViewed, listPullRequestFiles, parsePullRequestPath } from "./github.js";
 import { generateLocally, revealFile, saveShortVideo, writeShortScript } from "./generate.js";
 import { resolveLanguage, translate } from "./i18n.js";
 import { svg } from "./icons.js";
@@ -122,7 +122,19 @@ export class TourPanel {
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
-    this.player[action]();
+    if (action === "done") this.markDone();
+    else this.player[action]();
+  }
+
+  /**
+   * "Done": marks the step's file as Viewed when the tour has no more steps in it, then goes on,
+   * so GitHub's "n / m viewed" follows the tour.
+   */
+  async markDone() {
+    if (this.askingViewed || this.focusResult === "none") return;
+    if (this.player.isLastInFile) await markViewed(this.player.current.file);
+    if (this.player.isLast) this.render();
+    else this.player.next();
   }
 
   async toggleOpen() {
@@ -438,6 +450,7 @@ export class TourPanel {
           <button data-action="skipViewed" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("viewedSkip"))}</button></div>` : ""}
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
+        ${this.askingViewed || this.focusResult === "none" ? "" : `<button class="done" data-action="done" data-tip="${esc(this.t(this.player.isLastInFile ? "doneTipViewed" : "doneTipNext"))}">${svg("check", 14)}${esc(this.t(this.player.isLast ? "doneLast" : "doneNext"))}</button>`}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
           ${this.setupGuide()}
       </section>
@@ -587,6 +600,7 @@ export class TourPanel {
     on("nextFocus", "click", () => this.player.nextFocus());
     on("toggle", "click", () => this.player.toggle());
     on("openViewed", "click", () => this.openViewed());
+    on("done", "click", () => this.markDone());
     on("skipViewed", "click", () => this.skipViewed());
     on("refocus", "click", () => this.focusCurrent().then(() => this.render()));
     on("voice", "click", () => this.updateSettings({ voice: !this.settings.voice }));
@@ -742,6 +756,9 @@ const STYLES = `
   .note { white-space: pre-wrap; }
   .point { margin-top: 8px; padding: 8px 10px; border-left: 3px solid #bf8700; border-radius: 6px;
     background: var(--bgColor-attention-muted, #fff8c5); }
+  .done { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 3px 10px; border-radius: 6px; cursor: pointer; color: inherit; font-size: 12px;
+    border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-default, #fff); }
+  .done:hover { border-color: #8250df; }
   .point b { display: block; font-size: 11px; color: var(--fgColor-attention, #9a6700); }
   header > span { display: flex; gap: 6px; align-items: center; }
   .menu-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; cursor: pointer; font-size: 12px; color: inherit;
