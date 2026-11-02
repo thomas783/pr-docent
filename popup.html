@@ -8,9 +8,23 @@
       label { display: block; font-weight: 600; margin-bottom: 4px; }
       select { width: 100%; padding: 5px; font: inherit; }
       p { margin: 12px 0 0; color: #59636e; }
+      section { margin-top: 14px; padding-top: 12px; border-top: 1px solid #d1d9e0; }
+      h2 { margin: 0 0 8px; font-size: 13px; }
+      .types { display: flex; gap: 10px; margin-bottom: 6px; }
+      .types label { display: inline; font-weight: 400; }
+      textarea { box-sizing: border-box; width: 100%; padding: 6px; font: inherit; resize: vertical; }
+      .warn { margin: 6px 0 0; font-size: 12px; color: #9a6700; }
+      .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+      .row button { padding: 4px 12px; font: inherit; border-radius: 6px; border: 1px solid #8250df; background: #8250df; color: #fff; cursor: pointer; }
+      .row button:disabled { opacity: .5; cursor: default; }
+      #feedback-status { margin: 0; font-size: 12px; }
+      a { color: #0969da; }
       @media (prefers-color-scheme: dark) {
         body { color: #f0f6fc; background: #0d1117; }
         p { color: #9198a1; }
+        section { border-color: #3d444d; }
+        .warn { color: #d29922; }
+        a { color: #4493f8; }
       }
     </style>
   </head>
@@ -19,6 +33,17 @@
     <label for="language" data-i18n="popupLanguage"></label>
     <select id="language"></select>
     <p data-i18n="popupHint"></p>
+    <section id="feedback">
+      <h2 data-i18n="feedbackTitle"></h2>
+      <div class="types">
+        <label><input type="radio" name="type" value="bug" checked /> <span data-i18n="feedbackBug"></span></label>
+        <label><input type="radio" name="type" value="idea" /> <span data-i18n="feedbackIdea"></span></label>
+        <label><input type="radio" name="type" value="question" /> <span data-i18n="feedbackQuestion"></span></label>
+      </div>
+      <textarea id="feedback-text" rows="5" maxlength="4000"></textarea>
+      <p class="warn" data-i18n="feedbackPublic"></p>
+      <div class="row"><button id="feedback-send" data-i18n="feedbackSend"></button><p id="feedback-status"></p></div>
+    </section>
     <script type="module" src="src/popup.js"></script>
   </body>
 </html>
