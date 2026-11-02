@@ -10,6 +10,7 @@ const ICONS = {
   video: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-4v12l-6-4"/>',
   volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
   mute: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  comment: '<path d="M21 12a8 8 0 0 1-11.8 7L4 20l1.1-4.6A8 8 0 1 1 21 12Z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   down: '<path d="m6 9 6 6 6-6"/>',

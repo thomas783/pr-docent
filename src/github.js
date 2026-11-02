@@ -154,6 +154,78 @@ export async function markViewed(file) {
   return Boolean(viewedButton(fileId));
 }
 
+/**
+ * Opens GitHub's own comment form on [step]'s lines (on its file when the step has none), filled
+ * with [text], the way a reviewer would: click the first line number, shift-click the last, then
+ * the row's "Add comment". Nothing is posted; the reviewer edits the draft and sends it. Resolves to
+ * false when GitHub's controls weren't found.
+ */
+export async function openStepComment(step, text) {
+  const fileId = `diff-${await sha256Hex(step.file)}`;
+  const container = document.getElementById(fileId);
+  if (!container) return false;
+  const boxes = () => [...document.querySelectorAll('textarea[aria-label="Markdown value"]')].filter((t) => t.offsetParent);
+  const before = new Set(boxes());
+  if (step.lines) {
+    const side = step.side === "left" ? "L" : "R";
+    const anchor = (n) => document.querySelector(`[data-line-anchor="${fileId}${side}${n}"]`);
+    // A row has the old and the new line number (unified) or both sides (split).
+    const numberCell = (n) => {
+      const cells = [...(anchor(n)?.closest("tr")?.querySelectorAll("td.new-diff-line-number") ?? [])];
+      return side === "L" ? cells[0] : cells.at(-1);
+    };
+    const [start, end] = step.lines;
+    if (!numberCell(start) || !numberCell(end)) return false;
+    press(numberCell(start), false);
+    if (end !== start) press(numberCell(end), true);
+    // "Add comment" appears in a row while the pointer is over it.
+    hover(anchor(end));
+    const addButton = () => {
+      const buttons = [...(anchor(end)?.closest("tr")?.querySelectorAll('button[aria-label="Add comment"]') ?? [])];
+      return side === "L" ? buttons[0] : buttons.at(-1);
+    };
+    await waitFor(addButton, 1000);
+    if (!addButton()) return false;
+    addButton().click();
+  } else {
+    const fileButton = [...container.querySelectorAll("button")].find((b) => buttonName(b) === "Comment on this file");
+    if (!fileButton) return false;
+    fileButton.click();
+  }
+  const opened = () => boxes().find((t) => !before.has(t));
+  await waitFor(opened, 2000);
+  const textarea = opened();
+  if (!textarea) return false;
+  if (text) {
+    // GitHub's form is React's: set the value the way typing does, so it sees the draft.
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, text);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  textarea.focus();
+  return true;
+}
+
+/** A primary click on [el], with Shift when [shift], as GitHub's line selection expects. */
+function press(el, shift) {
+  const box = el.getBoundingClientRect();
+  const init = { bubbles: true, composed: true, cancelable: true, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2, shiftKey: shift, button: 0, pointerType: "mouse", isPrimary: true };
+  el.dispatchEvent(new PointerEvent("pointerdown", { ...init, buttons: 1 }));
+  el.dispatchEvent(new MouseEvent("mousedown", { ...init, buttons: 1 }));
+  el.dispatchEvent(new PointerEvent("pointerup", init));
+  el.dispatchEvent(new MouseEvent("mouseup", init));
+  el.dispatchEvent(new MouseEvent("click", init));
+}
+
+/** The pointer moving over [el], which makes GitHub show a row's own buttons. */
+function hover(el) {
+  if (!el) return;
+  const box = el.getBoundingClientRect();
+  const init = { bubbles: true, composed: true, clientX: box.x + 40, clientY: box.y + box.height / 2, pointerType: "mouse" };
+  el.dispatchEvent(new PointerEvent("pointerover", init));
+  el.dispatchEvent(new MouseEvent("mouseover", init));
+  el.dispatchEvent(new PointerEvent("pointermove", init));
+}
+
 /** Opens a collapsed file. */
 async function expandFile(fileId) {
   const toggle = [...(document.getElementById(fileId)?.querySelectorAll("button") ?? [])].find((b) => buttonName(b) === "Expand file");
