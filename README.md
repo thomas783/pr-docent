@@ -4,7 +4,16 @@
 
 A Chrome extension that acts as a docent for GitHub pull requests: on the **Files changed** page it takes a reviewer on a **tour** of the change. It breaks a pull request of thousands of lines into chapters, moves through the files and lines **in the order to read them**, frames them, and reads out what to look at. For teammates who won't read the code, it also plays a **short**: a 30-45 second explanation in pictures.
 
-> Status: in development. Not on the Chrome Web Store yet; install it in developer mode. Tours and shorts are written by Claude Code, either in GitHub Actions or on your own computer.
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/pr-docent/deejphpcfjilekklajdhdhfepjbenjii)** · [Try it on a demo pull request](#try-it)
+
+Tours and shorts are written by Claude Code, either in GitHub Actions or on your own computer.
+
+![A tour on a pull request's Files changed page: the panel shows the step, its review point and the controls, and the step's lines are framed in the diff](store/screenshots/en-1-tour.png)
+
+<p>
+  <img src="store/screenshots/en-2-narration.png" width="49%" alt="Narration framing the lines the current sentence talks about">
+  <img src="store/screenshots/en-3-short.png" width="49%" alt="A short: the change explained in pictures">
+</p>
 
 | Term | Meaning |
 |---|---|
@@ -48,11 +57,14 @@ Two demo pull requests stay open for trying PR Docent: the same small change (lo
 
 They target the `demo/base` branch, which holds the demo's code; neither is ever merged into `main`.
 
-## Install (development)
+## Install
+
+Install **[PR Docent from the Chrome Web Store](https://chromewebstore.google.com/detail/pr-docent/deejphpcfjilekklajdhdhfepjbenjii)**, then open a pull request's Files changed tab; the **PR Docent** button appears at the bottom right. Tours posted by GitHub Actions play right away; to create tours on your own computer, also set up the [local helper](#generating-tours-locally-your-own-claude-code).
+
+To run this repository's code instead (development):
 
 1. Turn on **Developer mode** in `chrome://extensions`.
 2. Click **Load unpacked** and choose this folder.
-3. Open a pull request's Files changed tab; the **PR Docent** button appears at the bottom right.
 
 ## Generating tours automatically (GitHub Actions)
 
