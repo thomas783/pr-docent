@@ -92,11 +92,34 @@ async function fetchConversation(pr) {
   return { html, page: new DOMParser().parseFromString(html, "text/html") };
 }
 
-/** Paths of every file in the PR, read from the diff containers' headers. */
+/**
+ * Paths of every file in the PR. On a large pull request GitHub draws only the files near the
+ * viewport, so the file tree (whose rows are keyed by path) is read too, not only the diffs.
+ */
 export function listPullRequestFiles() {
-  return [...document.querySelectorAll('[id^="diff-"][data-estimated-height]')]
-    .map((el) => el.textContent.match(/\u200e([^\u200e]+)\u200e/)?.[1])
-    .filter(Boolean);
+  const drawn = [...document.querySelectorAll('[id^="diff-"][data-estimated-height]')]
+    .map((el) => el.textContent.match(/\u200e([^\u200e]+)\u200e/)?.[1]);
+  // A folder's row holds its files' rows (and links); a file's row is the one its link sits in
+  const tree = [...document.querySelectorAll('a[href^="#diff-"]')].map((link) => link.closest('[role="treeitem"]')?.id);
+  return [...new Set([...drawn, ...tree].filter(Boolean))];
+}
+
+/**
+ * The file's diff, bringing it onto the page first if it isn't there: on a large pull request
+ * GitHub draws only the files near the viewport, and going to a file's #diff- anchor (as its file
+ * tree does) makes it draw that one. null when the file doesn't appear.
+ */
+async function bringIntoPage(fileId) {
+  if (!document.getElementById(fileId)) {
+    location.replace(`#${fileId}`); // no history entry for every step
+    await waitFor(() => document.getElementById(fileId), 2500);
+  }
+  return document.getElementById(fileId);
+}
+
+/** Whether the pull request has the file at all, by its row in GitHub's file tree. */
+function inFileTree(fileId) {
+  return Boolean(document.querySelector(`a[href="#${fileId}"]`));
 }
 
 /**
@@ -146,6 +169,7 @@ async function unmarkViewed(fileId) {
  */
 export async function markViewed(file) {
   const fileId = `diff-${await sha256Hex(file)}`;
+  await bringIntoPage(fileId);
   if (viewedButton(fileId)) return true;
   const toggle = [...(document.getElementById(fileId)?.querySelectorAll('button[aria-pressed="false"]') ?? [])].find((b) => b.textContent.trim() === "Viewed");
   if (!toggle) return false;
@@ -162,7 +186,7 @@ export async function markViewed(file) {
  */
 export async function openStepComment(step, text) {
   const fileId = `diff-${await sha256Hex(step.file)}`;
-  const container = document.getElementById(fileId);
+  const container = await bringIntoPage(fileId);
   if (!container) return false;
   const boxes = () => [...document.querySelectorAll('textarea[aria-label="Markdown value"]')].filter((t) => t.offsetParent);
   const before = new Set(boxes());
@@ -278,16 +302,17 @@ export function rowSelectors(hash, side, [start, end]) {
 }
 
 /**
- * Scrolls to a step and highlights it. Returns what was found, so the panel can say
- * when a file or line isn't on the page (e.g. the tour is for another revision).
+ * Scrolls to a step and highlights it. Returns what was found, so the panel can say when a file
+ * or line isn't there (e.g. the tour is for another revision, or GitHub didn't draw the file).
  */
 export async function focusStep(step, { openViewed = false } = {}) {
   const hash = await sha256Hex(step.file);
   const fileId = `diff-${hash}`;
   setStyle(EMPHASIS_STYLE_ID, "");
-  if (!document.getElementById(fileId)) {
+  if (!(await bringIntoPage(fileId))) {
     setHighlight("");
-    return { found: "none" };
+    // "unloaded": the PR has the file but GitHub didn't draw it; "none": the PR doesn't have it
+    return { found: inFileTree(fileId) ? "unloaded" : "none" };
   }
   // A file the reviewer marked as Viewed: show where it is, and open it (taking the mark off)
   // only when asked to.
