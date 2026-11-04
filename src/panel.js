@@ -818,6 +818,8 @@ const STYLES = `
   summary { cursor: pointer; font-weight: 600; }
   .uncovered summary { color: var(--fgColor-attention, #9a6700); }
   ul { padding-left: 18px; margin: 6px 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px; word-break: break-all; }
+  /* Long file lists (skipped, not covered) scroll within themselves rather than run off the panel */
+  details > ul { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
   .generate { display: block; width: 100%; margin-top: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
     border: 0; background: #8250df; color: #fff; font-weight: 600; }
   .generate:disabled { opacity: .7; cursor: default; }
