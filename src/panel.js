@@ -143,7 +143,7 @@ export class TourPanel {
    * so GitHub's "n / m viewed" follows the tour.
    */
   async markDone() {
-    if (this.askingViewed || this.focusResult === "none") return;
+    if (this.askingViewed || this.focusResult === "none" || this.focusResult === "unloaded") return;
     if (this.player.isLastInFile) await markViewed(this.player.current.file);
     if (this.player.isLast) this.render();
     else this.player.next();
@@ -369,13 +369,20 @@ export class TourPanel {
   async focusCurrent({ openViewed = false } = {}) {
     // A generation can finish after the user moved to another PR; leave that page alone.
     if (this.destroyed) return;
-    const result = await focusStep(this.player.current, { openViewed });
+    const step = this.player.current;
+    const result = await focusStep(step, { openViewed });
+    // Finding a file can take a moment on a large PR; if the reader has moved on, this is stale.
+    if (this.player.current !== step) return;
     this.focusResult = result.found;
-    this.status = result.found === "viewed" ? "" : result.found === "none"
-      ? this.t("fileNotOnPage")
-      : result.found === "file" && this.player.current.lines
-        ? this.t("linesNotFound")
-        : "";
+    this.status = this.focusMessage(result.found);
+  }
+
+  /** What to say about where the step was found. A file missing after the commits changed may simply be gone. */
+  focusMessage(found) {
+    if (found === "unloaded") return this.t("fileNotLoaded");
+    if (found === "none") return ["added", "rewritten", "base"].includes(this.freshness) ? this.t("fileGoneSinceTour") : this.t("fileNotOnPage");
+    if (found === "file" && this.player.current.lines) return this.t("linesNotFound");
+    return "";
   }
 
   /**
@@ -468,7 +475,7 @@ export class TourPanel {
           <button data-action="skipViewed" ${this.player.isLast ? "disabled" : ""}>${esc(this.t("viewedSkip"))}</button></div>` : ""}
         <p class="note">${esc(step.note)}</p>
         ${step.point ? `<p class="point"><b>${esc(this.t("reviewPoint"))}</b>${esc(step.point)}</p>` : ""}
-        ${this.askingViewed || this.focusResult === "none" ? "" : `<div class="step-actions">
+        ${this.askingViewed || this.focusResult === "none" || this.focusResult === "unloaded" ? "" : `<div class="step-actions">
           <button data-action="comment" data-tip="${esc(this.t(step.point ? "commentTipPoint" : "commentTip"))}">${svg("comment", 14)}${esc(this.t("comment"))}</button>
           <button data-action="done" data-tip="${esc(this.t(this.player.isLastInFile ? "doneTipViewed" : "doneTipNext"))}">${svg("check", 14)}${esc(this.t(this.player.isLast ? "doneLast" : "doneNext"))}</button></div>`}
         ${this.status ? `<p class="status">${esc(this.status)}</p>` : ""}
