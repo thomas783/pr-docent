@@ -112,7 +112,11 @@ export function listPullRequestFiles() {
  */
 async function bringIntoPage(fileId) {
   if (!document.getElementById(fileId)) {
-    const treeLink = document.querySelector(`a[href="#${fileId}"]`);
+    // Right after the page opens the file tree may not be drawn yet
+    const link = () => document.querySelector(`a[href="#${fileId}"]`);
+    await waitFor(() => link() || document.getElementById(fileId), 2000);
+    if (document.getElementById(fileId)) return document.getElementById(fileId);
+    const treeLink = link();
     if (treeLink) treeLink.click();
     else location.replace(`#${fileId}`); // no history entry for every step
     await waitFor(() => document.getElementById(fileId), 2500);
@@ -331,6 +335,8 @@ export async function focusStep(step, { openViewed = false } = {}) {
   if (step.lines) {
     await ensureRendered(fileId);
     const rows = rowSelectors(hash, step.side, step.lines);
+    // A file just drawn fills in its lines from the top, so the step's may come a moment later
+    await waitFor(() => rows.some((sel) => document.querySelector(sel)), 2000);
     const present = rows.map((sel) => document.querySelector(sel)).filter(Boolean);
     if (present.length) {
       const shown = rowsBetween(present);
