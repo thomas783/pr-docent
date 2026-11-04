@@ -369,7 +369,10 @@ export class TourPanel {
   async focusCurrent({ openViewed = false } = {}) {
     // A generation can finish after the user moved to another PR; leave that page alone.
     if (this.destroyed) return;
-    const result = await focusStep(this.player.current, { openViewed });
+    const step = this.player.current;
+    const result = await focusStep(step, { openViewed });
+    // Finding a file can take a moment on a large PR; if the reader has moved on, this is stale.
+    if (this.player.current !== step) return;
     this.focusResult = result.found;
     this.status = this.focusMessage(result.found);
   }
