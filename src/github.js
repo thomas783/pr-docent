@@ -106,12 +106,15 @@ export function listPullRequestFiles() {
 
 /**
  * The file's diff, bringing it onto the page first if it isn't there: on a large pull request
- * GitHub draws only the files near the viewport, and going to a file's #diff- anchor (as its file
- * tree does) makes it draw that one. null when the file doesn't appear.
+ * GitHub draws only the files near the viewport. Clicking the file in GitHub's file tree makes it
+ * draw that one; going to the #diff- anchor works only sometimes, so it's the fallback for when
+ * the tree is closed. null when the file doesn't appear.
  */
 async function bringIntoPage(fileId) {
   if (!document.getElementById(fileId)) {
-    location.replace(`#${fileId}`); // no history entry for every step
+    const treeLink = document.querySelector(`a[href="#${fileId}"]`);
+    if (treeLink) treeLink.click();
+    else location.replace(`#${fileId}`); // no history entry for every step
     await waitFor(() => document.getElementById(fileId), 2500);
   }
   return document.getElementById(fileId);
